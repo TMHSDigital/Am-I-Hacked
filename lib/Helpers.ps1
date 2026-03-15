@@ -558,6 +558,7 @@ function Compare-Baseline {
         $oldSvcNames = $old.Services | ForEach-Object { $_.Name }
         $currentSvcs = Get-CimInstance Win32_Service -ErrorAction SilentlyContinue
         foreach ($svc in $currentSvcs) {
+            if ($svc.Name -match '_[0-9a-f]{5,}$') { continue }  # skip per-user session service instances (e.g. AarSvc_ddff8)
             if ($svc.Name -notin $oldSvcNames) {
                 Add-Finding -Severity "WARNING" -Category "Baseline" `
                     -Title "New Service: $($svc.Name)" `
