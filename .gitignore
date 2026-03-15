@@ -1,0 +1,17 @@
+# Reports (contain sensitive system info)
+reports/*.html
+reports/*.json
+
+# User config with API keys
+config/config.json
+config/config.local.json
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

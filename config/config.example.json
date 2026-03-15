@@ -1,0 +1,76 @@
+{
+  "ProcessWhitelist": [
+    "svchost", "csrss", "wininit", "services", "lsass", "smss",
+    "winlogon", "dwm", "taskhostw", "explorer", "runtimebroker",
+    "searchhost", "startmenuexperiencehost", "textinputhost",
+    "sihost", "ctfmon", "conhost", "dllhost", "fontdrvhost",
+    "msdtc", "spoolsv", "wuauclt", "audiodg", "searchindexer",
+    "securityhealthservice", "securityhealthsystray", "sgrmbroker",
+    "systemsettings", "applicationframehost", "shellexperiencehost",
+    "lockapp", "msedge", "msedgewebview2", "widgetservice"
+  ],
+  "ServiceWhitelist": [],
+  "TrustedIPs": [
+    "13.107.0.0/16",
+    "20.0.0.0/8",
+    "23.0.0.0/8",
+    "104.0.0.0/8"
+  ],
+  "TrustedPorts": [135, 139, 445, 5040, 7680, 5432, 5357, 2179, 8811, 3306, 6379, 27017, 8080, 8443, 3000, 5000, 5500, 8000],
+  "VirusTotalAPIKey": "",
+  "AbuseIPDBKey": "",
+  "AccountMaxAgeDays": 7,
+  "FileSystemMaxAgeDays": 3,
+  "MaxEventLogEntries": 1000,
+  "SuspiciousParentChild": [
+    { "Parent": "winword.exe", "Child": "powershell.exe" },
+    { "Parent": "winword.exe", "Child": "cmd.exe" },
+    { "Parent": "winword.exe", "Child": "wscript.exe" },
+    { "Parent": "winword.exe", "Child": "cscript.exe" },
+    { "Parent": "excel.exe", "Child": "powershell.exe" },
+    { "Parent": "excel.exe", "Child": "cmd.exe" },
+    { "Parent": "outlook.exe", "Child": "powershell.exe" },
+    { "Parent": "outlook.exe", "Child": "cmd.exe" },
+    { "Parent": "mshta.exe", "Child": "powershell.exe" },
+    { "Parent": "svchost.exe", "Child": "cmd.exe" },
+    { "Parent": "explorer.exe", "Child": "mshta.exe" },
+    { "Parent": "wmiprvse.exe", "Child": "powershell.exe" }
+  ],
+  "SuspiciousTempExtensions": [
+    ".exe", ".dll", ".scr", ".bat", ".cmd", ".vbs", ".vbe",
+    ".js", ".jse", ".wsf", ".wsh", ".ps1", ".psm1", ".psd1",
+    ".hta", ".cpl", ".msi", ".msp", ".com", ".pif"
+  ],
+  "TrustedCompanies": [
+    "Microsoft Corporation", "Google LLC", "Slack Technologies",
+    "Spotify AB", "Discord Inc.", "Mozilla Corporation",
+    "Apple Inc.", "Adobe Inc.", "Valve Corporation",
+    "GitHub, Inc.", "GitHub", "Node.js Foundation", "OpenJS Foundation",
+    "Rockstar Games", "Cfx.re", "Python Software Foundation",
+    "NVIDIA Corporation", "Intel Corporation", "Samsung Electronics",
+    "Amazon.com Services LLC", "Amazon Web Services",
+    "Proton AG", "Notion Labs, Inc.", "LM Studio", "Anthropic",
+    "JetBrains s.r.o.", "Docker Inc", "Canonical Ltd.",
+    "Postman Inc.", "Activision Publishing", "Blizzard Entertainment",
+    "Electronic Arts", "Epic Games", "Ubisoft",
+    "Dropbox, Inc.", "Zoom Video Communications, Inc.",
+    "1Password", "AgileBits Inc.", "Bitwarden Inc.",
+    "The Chromium Authors", "The Electron Authors"
+  ],
+  "TrustedAppDirs": [
+    "GitHub Desktop", "GitHubDesktop", "FiveM", "FiveMApplication",
+    "LM Studio", "lm-studio", "Discord", "Slack", "Spotify",
+    "Microsoft Teams", "ms-teams", "Notion", "Postman",
+    "Microsoft VS Code", "Code", "Programs\\Python",
+    "Docker Desktop", "Steam", "Epic Games", "Ubisoft",
+    "1Password", "Bitwarden", "Proton", "node_modules",
+    "OneDrive", "WindowsApps", "WinGet", "squirrel.windows",
+    "Plutonium", "cursor", "Claude", "Amazon Games",
+    "NuGet", "npm", "pip", "cargo"
+  ],
+  "TrustedDomainSuffixes": [
+    ".microsoft.com", ".windowsupdate.com", ".akamaized.net",
+    ".cloudfront.net", ".slack-msgs.com", ".googleapis.com",
+    ".gstatic.com", ".steamcontent.com"
+  ]
+}
