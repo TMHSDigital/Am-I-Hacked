@@ -17,3 +17,4 @@ desktop.ini
 .claude/
 *.swp
 *.swo
+fix-bom.ps1
