@@ -12,7 +12,7 @@
 [![PowerShell 5.1+](https://img.shields.io/badge/PowerShell-5.1%2B-0d1117?style=for-the-badge&logo=powershell&logoColor=5391FE)](https://docs.microsoft.com/powershell/)
 [![Windows 10/11](https://img.shields.io/badge/Windows-10%20%2F%2011-0d1117?style=for-the-badge&logo=windows&logoColor=white)](https://www.microsoft.com/windows)
 [![License: MIT](https://img.shields.io/badge/License-MIT-0d1117?style=for-the-badge&logoColor=white)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-0.3.4-FF6B6B?style=for-the-badge)](#changelog)
+[![Version](https://img.shields.io/badge/Version-0.4.0-FF6B6B?style=for-the-badge)](#changelog)
 
 [![Zero Dependencies](https://img.shields.io/badge/Dependencies-Zero-0d1117?style=flat-square&labelColor=0d1117)](#)
 [![MITRE ATT&CK](https://img.shields.io/badge/MITRE%20ATT%26CK-40%2B%20Techniques-ff3333?style=flat-square&labelColor=0d1117)](#mitre-attck-coverage)
@@ -103,6 +103,9 @@ Baselines enable **change detection** — the most powerful signal for catching 
 
 # Mask operator identity in output (for screenshots / sharing)
 .\AmIHacked.ps1 -Redact
+
+# CI / AI agent mode (structured JSON summary + exit code)
+.\AmIHacked.ps1 -CIMode -ExportJson -Offline
 ```
 
 | Parameter | Description |
@@ -116,6 +119,33 @@ Baselines enable **change detection** — the most powerful signal for catching 
 | `-ExportJson` | Emit findings as JSON alongside HTML |
 | `-VerboseOutput` | Enable verbose console output |
 | `-Redact` | Mask operator identity (computer name, username, paths) in all output |
+| `-CIMode` | Agent/CI-friendly output: suppress banner + browser, auto-redact, JSON summary on stdout, structured exit code |
+
+---
+
+## CI / AI Agent Usage
+
+`-CIMode` makes the tool usable by CI pipelines and AI terminal agents (Claude Code, Cursor, etc.):
+
+```powershell
+.\AmIHacked.ps1 -CIMode -ExportJson -Offline
+```
+
+**What changes in CI mode:**
+
+- ASCII banner is replaced with a single plain-text header
+- Browser auto-open is suppressed
+- `-Redact` is enabled automatically (operator identity masked)
+- A machine-readable JSON summary is printed to stdout after all output:
+
+```
+---AMIHACKED-SUMMARY-JSON---
+{"verdict":"CAUTION","critical":0,"warning":3,"info":12,"total":15,"duration":28.4,"reportPath":"...","version":"0.4.0"}
+```
+
+- Exit code reflects findings: **0** = clean, **1** = warnings only, **2** = critical findings detected
+
+Non-interactive environments (e.g. piped through `powershell.exe -NonInteractive`) auto-enable CI mode behaviors.
 
 ---
 

@@ -54,6 +54,7 @@ function Invoke-YourModuleNameChecks {
 - **No external dependencies**: PowerShell 5.1+ built-in cmdlets only.
 - **MITRE ATT&CK**: Every finding should include a `-MITRE @("T1xxx.xxx")` array of relevant technique IDs.
 - **Redaction**: Handled automatically by `Add-Finding`. Module authors do not need to mask sensitive data.
+- **Non-interactive mode**: `$script:NonInteractive` is set when `-CIMode` is used or the environment is non-interactive. Modules do not need to check this -- it's handled at the orchestrator level.
 
 ## Running the Test Harness
 

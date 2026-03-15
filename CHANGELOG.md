@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.0] - 2026-03-15
+
+### Added
+- **`-CIMode` switch** -- agent/CI-friendly output: suppresses ASCII banner and browser auto-open, auto-enables `-Redact`, prints a JSON summary to stdout (delimited by `---AMIHACKED-SUMMARY-JSON---`), and exits with structured code (0=clean, 1=warnings, 2=critical)
+- **`$PSScriptRoot` fallback** -- fixes "Cannot bind argument" error when invoked via `powershell.exe -File`
+- **Non-interactive auto-detection** -- `[Environment]::UserInteractive` check auto-enables CI behaviors in piped/headless environments
+- CIMode test block in `tests/Invoke-MockScan.ps1` validating JSON summary and exit codes
+- "CI / AI Agent Usage" section in README and "Using with AI Agents" section in CLAUDE.md
+
+### Fixed
+- Console verdict label `THREATS DETECTED` now reads `COMPROMISED` to match the HTML report
+
 ## [0.3.4] - 2026-03-15
 
 ### Added

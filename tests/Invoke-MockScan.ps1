@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Test harness for Am I Hacked — creates safe mock IOCs and validates detection.
 .DESCRIPTION
@@ -185,6 +185,49 @@ if (-not $jsonFiles) {
         $script:TestsPassed++
     } else {
         Write-Host "  [FAIL] Baseline was auto-exported without -CreateBaseline" -ForegroundColor Red
+        $script:TestsFailed++
+    }
+
+    # Validate -CIMode output
+    Write-TestHeader "CIMode JSON Summary"
+    $ciOutputDir = Join-Path $testTempDir "reports_ci"
+    New-Item -ItemType Directory -Path $ciOutputDir -Force | Out-Null
+    $ciOutput = $null
+    $ciExit = 0
+    try {
+        $ciOutput = & "$repoRoot\AmIHacked.ps1" -OutputPath $ciOutputDir -Offline -CIMode -ExportJson 2>&1
+        $ciExit = $LASTEXITCODE
+    } catch {
+        $ciExit = $LASTEXITCODE
+    }
+    $ciOutputStr = $ciOutput -join "`n"
+    if ($ciOutputStr -match "---AMIHACKED-SUMMARY-JSON---") {
+        $jsonLine = ($ciOutputStr -split "---AMIHACKED-SUMMARY-JSON---")[-1].Trim()
+        try {
+            $ciSummary = $jsonLine | ConvertFrom-Json
+            if ($ciSummary.verdict -and $null -ne $ciSummary.critical -and $null -ne $ciSummary.warning -and
+                $null -ne $ciSummary.info -and $null -ne $ciSummary.total -and $ciSummary.reportPath) {
+                Write-Host "  [PASS] CIMode JSON summary contains all required fields" -ForegroundColor Green
+                $script:TestsPassed++
+            } else {
+                Write-Host "  [FAIL] CIMode JSON summary missing fields" -ForegroundColor Red
+                $script:TestsFailed++
+            }
+        } catch {
+            Write-Host "  [FAIL] CIMode JSON summary failed to parse: $_" -ForegroundColor Red
+            $script:TestsFailed++
+        }
+    } else {
+        Write-Host "  [FAIL] CIMode output missing ---AMIHACKED-SUMMARY-JSON--- delimiter" -ForegroundColor Red
+        $script:TestsFailed++
+    }
+
+    Write-TestHeader "CIMode Exit Code"
+    if ($ciExit -ge 0 -and $ciExit -le 2) {
+        Write-Host "  [PASS] CIMode exit code is $ciExit (0=clean, 1=warning, 2=critical)" -ForegroundColor Green
+        $script:TestsPassed++
+    } else {
+        Write-Host "  [FAIL] CIMode exit code is $ciExit (expected 0, 1, or 2)" -ForegroundColor Red
         $script:TestsFailed++
     }
 }

@@ -30,6 +30,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Mask operator identity in all output
 .\AmIHacked.ps1 -Redact
 
+# CI / AI agent mode (structured output, no browser, auto-redact)
+.\AmIHacked.ps1 -CIMode -ExportJson -Offline
+
 # Run the test harness (creates mock IOCs, validates detections)
 .\tests\Invoke-MockScan.ps1
 
@@ -48,7 +51,7 @@ There is no formal CI system — testing is done manually via the mock scan harn
 2. Reads config from `config/config.json` (falls back to built-in defaults if absent)
 3. Auto-discovers and dot-sources every `modules/Check-*.ps1`
 4. Calls each module's `Invoke-{ModuleName}Checks` function in sequence
-5. Passes collected findings to `ReportGenerator.ps1` → opens HTML report in browser
+5. Passes collected findings to `ReportGenerator.ps1` → opens HTML report in browser (suppressed in `-CIMode`)
 
 ### Finding System
 
@@ -94,6 +97,33 @@ Redaction is applied at two choke points:
 2. `$script:SystemInfo` — redacts ComputerName, UserName, Domain after collection
 
 Individual modules do not need to handle redaction.
+
+### CI / AI Agent Mode
+
+`-CIMode` makes the tool usable by AI terminal agents and CI pipelines:
+
+- Suppresses ASCII banner (plain-text header instead) and browser auto-open
+- Auto-enables `-Redact` so operator identity is never leaked
+- Prints a JSON summary to stdout after all output, delimited by `---AMIHACKED-SUMMARY-JSON---`
+- Exits with structured code: 0 = clean, 1 = warnings, 2 = critical
+
+Non-interactive environments auto-enable these behaviors via `[Environment]::UserInteractive`.
+
+Recommended invocation from an AI agent:
+
+```powershell
+.\AmIHacked.ps1 -CIMode -ExportJson -Offline
+```
+
+To parse the summary programmatically:
+
+```powershell
+$output = .\AmIHacked.ps1 -CIMode -ExportJson 2>&1
+$jsonLine = ($output -join "`n" -split "---AMIHACKED-SUMMARY-JSON---")[-1].Trim()
+$summary = $jsonLine | ConvertFrom-Json
+```
+
+`$PSScriptRoot` has a fallback for `powershell.exe -File` invocation (where it would otherwise be empty).
 
 ## Module Overview
 

@@ -29,6 +29,10 @@
 .PARAMETER Redact
     Mask the operator's identity (computer name, username, domain, profile path) in console output,
     HTML reports, and JSON exports. Useful for screenshots or sharing reports publicly.
+.PARAMETER CIMode
+    Machine-friendly mode for CI pipelines and AI agents (Claude Code, Cursor, etc.).
+    Suppresses the ASCII banner and browser auto-open, auto-enables -Redact,
+    prints a JSON summary to stdout, and exits with a structured code (0=clean, 1=warnings, 2=critical).
 .NOTES
     Author: TM Hospitality Strategies / Am I Hacked Project
     License: MIT
@@ -46,8 +50,15 @@ param(
     [switch]$CreateBaseline,
     [switch]$ExportJson,
     [switch]$VerboseOutput,
-    [switch]$Redact
+    [switch]$Redact,
+    [switch]$CIMode
 )
+
+# ── PSScriptRoot fallback (empty when invoked via powershell.exe -File) ────
+
+if (-not $PSScriptRoot) {
+    $PSScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+}
 
 # ── Bootstrap ────────────────────────────────────────────────────────────────
 
@@ -57,10 +68,16 @@ $script:Findings = [System.Collections.ArrayList]::new()
 $script:SystemInfo = @{}
 $script:Config = @{}
 $script:OfflineMode = $Offline.IsPresent
-$script:RedactMode = $Redact.IsPresent
+$script:NonInteractive = $CIMode.IsPresent -or
+                          -not [Environment]::UserInteractive
+if ($script:NonInteractive) {
+    $script:RedactMode = $true
+} else {
+    $script:RedactMode = $Redact.IsPresent
+}
 $script:RedactMap = @{}
 
-$script:Version = "0.3.4"
+$script:Version = "0.4.0"
 
 # ── Helpers (loaded first) ───────────────────────────────────────────────────
 
@@ -99,7 +116,12 @@ $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIde
 )
 $script:IsAdmin = $isAdmin
 
-Write-Banner
+if (-not $script:NonInteractive) {
+    Write-Banner
+} else {
+    $adminTag = if ($isAdmin) { "ADMIN" } else { "LIMITED" }
+    Write-Host "Am I Hacked? v$($script:Version) [$adminTag] $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+}
 
 # ── Post-Banner Status Lines ─────────────────────────────────────────────────
 
@@ -114,7 +136,9 @@ if ($script:OfflineMode) {
     Write-Status "OFFLINE MODE: API integrations disabled." -Color Yellow
 }
 
-if ($script:RedactMode) {
+if ($script:NonInteractive) {
+    Write-Status "CI MODE: Agent-friendly output enabled (redact on, browser suppressed)." -Color Yellow
+} elseif ($script:RedactMode) {
     Write-Status "REDACT MODE: Sensitive identifiers will be masked." -Color Yellow
 }
 
@@ -277,7 +301,7 @@ $totalCount = $script:Findings.Count
 $verdict = "CLEAN"
 $verdictColor = "Green"
 if ($critCount -gt 0) {
-    $verdict = "THREATS DETECTED"
+    $verdict = "COMPROMISED"
     $verdictColor = "Red"
 } elseif ($warnCount -gt 3) {
     $verdict = "SUSPICIOUS"
@@ -333,6 +357,27 @@ if ($critCount -gt 0) {
 Write-Host ""
 Write-Host "  $reportFile" -ForegroundColor White
 Write-Host ""
+
+# ── CI Mode: JSON summary + structured exit code ─────────────────────────────
+
+if ($script:NonInteractive) {
+    $summary = @{
+        verdict    = $verdict
+        critical   = $critCount
+        warning    = $warnCount
+        info       = $infoCount
+        total      = $totalCount
+        duration   = [math]::Round($duration.TotalSeconds, 1)
+        reportPath = $reportFile
+        version    = $script:Version
+    }
+    Write-Host "---AMIHACKED-SUMMARY-JSON---"
+    Write-Host ($summary | ConvertTo-Json -Compress)
+
+    if ($critCount -gt 0) { exit 2 }
+    elseif ($warnCount -gt 0) { exit 1 }
+    else { exit 0 }
+}
 
 try {
     Start-Process $reportFile
