@@ -199,7 +199,7 @@ function Invoke-FileSystemChecks {
         Write-Status "Checking file hashes against VirusTotal..."
 
         $checked = 0
-        $maxVT = 4
+        $maxVT = if ($script:Config.MaxVTLookups) { [int]$script:Config.MaxVTLookups } else { 4 }
 
         foreach ($file in $vtCandidates) {
             if ($checked -ge $maxVT) {

@@ -75,8 +75,8 @@ function Invoke-NetworkChecks {
                 -MITRE @("T1071.001")
         }
 
+        $commonPorts = if ($script:Config.TrustedPorts) { $script:Config.TrustedPorts } else { @(80, 443, 8080, 8443, 993, 995, 587, 465, 53, 22) }
         foreach ($c in $connList) {
-            $commonPorts = @(80, 443, 8080, 8443, 993, 995, 587, 465, 53, 22)
             if ($c.RemotePort -notin $commonPorts -and $c.RemotePort -lt 1024) {
                 Add-Finding -Severity "WARNING" -Category "Network" `
                     -Title "Connection on Uncommon Port: $($c.Process) → ${ip}:$($c.RemotePort)" `
@@ -95,7 +95,7 @@ function Invoke-NetworkChecks {
         Write-Status "Checking external IPs against AbuseIPDB..."
 
         $checkedCount = 0
-        $maxChecks = 30
+        $maxChecks = if ($script:Config.AbuseIPDBMaxChecks) { [int]$script:Config.AbuseIPDBMaxChecks } else { 30 }
 
         foreach ($ip in $externalIPs.Keys) {
             if ($checkedCount -ge $maxChecks) {
@@ -187,7 +187,7 @@ function Invoke-NetworkChecks {
     foreach ($key in $seenListeners.Keys) {
         $entry = $seenListeners[$key]
         $severity = "WARNING"
-        $backdoorPorts = @(4444, 5555, 6666, 1234, 31337, 12345, 54321, 9999, 1337)
+        $backdoorPorts = if ($script:Config.BackdoorPorts) { $script:Config.BackdoorPorts } else { @(4444, 5555, 6666, 1234, 31337, 12345, 54321, 9999, 1337) }
         if ($entry.Port -in $backdoorPorts) { $severity = "CRITICAL" }
         $addrStr = ($entry.Addresses | Sort-Object -Unique) -join ", "
 
@@ -212,13 +212,7 @@ function Invoke-NetworkChecks {
     $adapters = Get-DnsClientServerAddress -ErrorAction SilentlyContinue |
         Where-Object { $_.ServerAddresses.Count -gt 0 }
 
-    $knownDNS = @(
-        "8.8.8.8", "8.8.4.4",
-        "1.1.1.1", "1.0.0.1",
-        "9.9.9.9", "149.112.112.112",
-        "208.67.222.222", "208.67.220.220",
-        "76.76.2.0", "76.76.10.0"
-    )
+    $knownDNS = if ($script:Config.KnownDNSServers) { $script:Config.KnownDNSServers } else { @("8.8.8.8","8.8.4.4","1.1.1.1","1.0.0.1","9.9.9.9","149.112.112.112","208.67.222.222","208.67.220.220","76.76.2.0","76.76.10.0") }
 
     $seenDns = @{}
     foreach ($adapter in $adapters) {

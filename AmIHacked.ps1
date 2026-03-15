@@ -80,7 +80,7 @@ if ($script:NonInteractive) {
 $script:RedactMap = @{}
 $script:SuppressedCount = 0
 
-$script:Version = "0.4.7"
+$script:Version = "0.4.8"
 
 # ── Helpers (loaded first) ───────────────────────────────────────────────────
 
@@ -284,7 +284,8 @@ Generate-HtmlReport -Findings $script:Findings `
                     -SystemInfo $script:SystemInfo `
                     -OutputFile $reportFile `
                     -Duration $duration `
-                    -Version $script:Version
+                    -Version $script:Version `
+                    -SuppressedCount $script:SuppressedCount
 
 Write-SectionEnd
 

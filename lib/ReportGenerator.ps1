@@ -9,7 +9,8 @@ function Generate-HtmlReport {
         [hashtable]$SystemInfo,
         [string]$OutputFile,
         [timespan]$Duration,
-        [string]$Version
+        [string]$Version,
+        [int]$SuppressedCount = 0
     )
 
     $critCount = ($Findings | Where-Object { $_.Severity -eq "CRITICAL" }).Count
@@ -385,6 +386,7 @@ function Generate-HtmlReport {
         .stat-warning .stat-value { color: var(--warning); }
         .stat-info .stat-value { color: var(--info); }
         .stat-total .stat-value { color: var(--text-primary); }
+        .stat-suppressed .stat-value { color: var(--text-secondary); }
 
         /* -- System Info -- */
         .system-info {
@@ -731,6 +733,7 @@ function Generate-HtmlReport {
                 <div class="stat-value">${totalCount}</div>
                 <div class="stat-label">Total Findings</div>
             </div>
+            $(if ($SuppressedCount -gt 0) { "<div class=`"stat-card stat-suppressed`"><div class=`"stat-value`">$SuppressedCount</div><div class=`"stat-label`">Suppressed</div></div>" })
         </div>
 
         <div class="system-info">

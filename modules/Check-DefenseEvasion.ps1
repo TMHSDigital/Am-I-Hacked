@@ -121,6 +121,34 @@ function Invoke-DefenseEvasionChecks {
         Write-Verbose "Could not check ScriptBlockLogging policy: $_"
     }
 
+    try {
+        $ml = Get-ItemProperty "HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ModuleLogging" -ErrorAction SilentlyContinue
+        if (-not $ml -or -not $ml.EnableModuleLogging -or $ml.EnableModuleLogging -eq 0) {
+            Add-Finding -Severity "INFO" -Category "DefenseEvasion" `
+                -Title "PowerShell Module Logging Not Enabled" `
+                -Description "Module logging is not enabled via policy. When enabled, PowerShell logs pipeline execution details to the event log (Event ID 4103), helping detect malicious module usage." `
+                -Remediation "Set-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ModuleLogging' -Name EnableModuleLogging -Value 1" `
+                -Details @{ Key = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ModuleLogging\EnableModuleLogging"; Value = "absent or 0" } `
+                -MITRE @("T1562.002")
+        }
+    } catch {
+        Write-Verbose "Could not check ModuleLogging policy: $_"
+    }
+
+    try {
+        $transcript = Get-ItemProperty "HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\Transcription" -ErrorAction SilentlyContinue
+        if (-not $transcript -or -not $transcript.EnableTranscripting -or $transcript.EnableTranscripting -eq 0) {
+            Add-Finding -Severity "INFO" -Category "DefenseEvasion" `
+                -Title "PowerShell Transcription Not Enabled" `
+                -Description "PowerShell transcription is not enabled via policy. When enabled, PowerShell logs all input and output to text files, providing a full audit trail of PowerShell activity on the system." `
+                -Remediation "Set-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\Transcription' -Name EnableTranscripting -Value 1" `
+                -Details @{ Key = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\Transcription\EnableTranscripting"; Value = "absent or 0" } `
+                -MITRE @("T1562.002")
+        }
+    } catch {
+        Write-Verbose "Could not check Transcription policy: $_"
+    }
+
     # ── 3. Windows Defender Real-Time Protection ─────────────────────────
 
     Write-Status "Checking Defender real-time protection..."

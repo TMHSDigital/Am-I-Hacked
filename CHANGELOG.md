@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.8] - 2026-03-15
+
+### Added
+- **Configurable network/API limits** -- `BackdoorPorts`, `KnownDNSServers`, `AbuseIPDBMaxChecks`, `MaxVTLookups` config fields with sensible defaults; `commonPorts` in Check-Network.ps1 now uses `TrustedPorts` from config
+- **Module Logging detection** -- Check-DefenseEvasion.ps1 flags when PowerShell Module Logging is not enabled (INFO, T1562.002)
+- **Transcription detection** -- Check-DefenseEvasion.ps1 flags when PowerShell Transcription is not enabled (INFO, T1562.002)
+- **Report suppressed count** -- HTML report stats grid shows a "Suppressed" card when findings have been suppressed via config
+
 ## [0.4.7] - 2026-03-15
 
 ### Added
