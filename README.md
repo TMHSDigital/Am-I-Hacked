@@ -12,7 +12,7 @@
 [![PowerShell 5.1+](https://img.shields.io/badge/PowerShell-5.1%2B-0d1117?style=for-the-badge&logo=powershell&logoColor=5391FE)](https://docs.microsoft.com/powershell/)
 [![Windows 10/11](https://img.shields.io/badge/Windows-10%20%2F%2011-0d1117?style=for-the-badge&logo=windows&logoColor=white)](https://www.microsoft.com/windows)
 [![License: MIT](https://img.shields.io/badge/License-MIT-0d1117?style=for-the-badge&logoColor=white)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-0.4.3-FF6B6B?style=for-the-badge)](#changelog)
+[![Version](https://img.shields.io/badge/Version-0.4.4-FF6B6B?style=for-the-badge)](#changelog)
 
 [![Zero Dependencies](https://img.shields.io/badge/Dependencies-Zero-0d1117?style=flat-square&labelColor=0d1117)](#)
 [![MITRE ATT&CK](https://img.shields.io/badge/MITRE%20ATT%26CK-40%2B%20Techniques-ff3333?style=flat-square&labelColor=0d1117)](#mitre-attck-coverage)
@@ -241,6 +241,7 @@ Then edit `config/config.json` (gitignored — API keys stay local):
 | `SuspiciousParentChild` | `object[]` | Parent→Child process rules |
 | `SuspiciousTempExtensions` | `string[]` | Extensions flagged in temp directories |
 | `TrustedAppDirs` | `string[]` | App directory names to skip during temp-dir scanning |
+| `Suppressions` | `object[]` | Findings to silence permanently. Each entry has a `pattern` (wildcard, matched against Title) and optional `reason` |
 | `AccountMaxAgeDays` | `int` | Flag accounts created within N days |
 | `FileSystemMaxAgeDays` | `int` | Flag recently modified system executables |
 | `MaxEventLogEntries` | `int` | Max events to scan per log |

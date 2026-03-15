@@ -174,6 +174,15 @@ function Add-Finding {
     $Remediation = Invoke-Redact $Remediation
     $Details     = Invoke-RedactObject $Details
 
+    if ($script:Config.Suppressions) {
+        foreach ($sup in $script:Config.Suppressions) {
+            if ($Title -like $sup.pattern) {
+                $script:SuppressedCount++
+                return
+            }
+        }
+    }
+
     $finding = [PSCustomObject]@{
         Severity    = $Severity
         Category    = $Category

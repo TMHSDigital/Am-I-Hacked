@@ -78,6 +78,7 @@ Copied from `config/config.example.json`. Controls:
 - Optional API keys: VirusTotal (`VirusTotalAPIKey`), AbuseIPDB (`AbuseIPDBKey`)
 - Suspicious parent→child process rules
 - Per-module tuning parameters
+- `Suppressions`: array of `{ pattern, reason }` objects. Findings whose Title matches a pattern (wildcard via `-like`) are silently dropped before storing or printing. A `$script:SuppressedCount` counter tracks how many were suppressed; the count appears in the summary box and CI JSON output (`suppressed` key).
 
 `config/config.json` is gitignored to keep API keys local.
 

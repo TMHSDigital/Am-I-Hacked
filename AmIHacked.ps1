@@ -78,8 +78,9 @@ if ($script:NonInteractive) {
     $script:RedactMode = $Redact.IsPresent
 }
 $script:RedactMap = @{}
+$script:SuppressedCount = 0
 
-$script:Version = "0.4.3"
+$script:Version = "0.4.4"
 
 # ── Helpers (loaded first) ───────────────────────────────────────────────────
 
@@ -350,6 +351,7 @@ if ($script:NonInteractive) {
     Write-SummaryLine "CRITICAL  " "$critCount" "Red" $w
     Write-SummaryLine "WARNING   " "$warnCount" "Yellow" $w
     Write-SummaryLine "INFO      " "$infoCount" "DarkCyan" $w
+    Write-SummaryLine "Suppressed " "$($script:SuppressedCount)" "DarkGray" $w
     Write-Host "  |  $(' ' * ($w - 2))  |"
     Write-SummaryLine "Total     " "$totalCount findings" "White" $w
     Write-SummaryLine "Duration  " "$durationStr" "DarkGray" $w
@@ -378,6 +380,7 @@ if ($script:NonInteractive) {
     Write-SummaryLine "CRITICAL  " "$critCount" $(if ($critCount -gt 0) { "Red" } else { "Green" }) $w
     Write-SummaryLine "WARNING   " "$warnCount" $(if ($warnCount -gt 0) { "Yellow" } else { "Green" }) $w
     Write-SummaryLine "INFO      " "$infoCount" "DarkCyan" $w
+    Write-SummaryLine "Suppressed " "$($script:SuppressedCount)" "DarkGray" $w
     Write-Host "  ║$(' ' * $w)║" -ForegroundColor DarkCyan
     Write-SummaryLine "Total     " "$totalCount findings" "White" $w
     Write-SummaryLine "Duration  " "$durationStr" "DarkGray" $w
@@ -406,6 +409,7 @@ if ($script:NonInteractive) {
         critical   = $critCount
         warning    = $warnCount
         info       = $infoCount
+        suppressed = $script:SuppressedCount
         total      = $totalCount
         duration   = [math]::Round($duration.TotalSeconds, 1)
         reportPath = $reportFile

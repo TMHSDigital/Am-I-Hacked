@@ -73,5 +73,9 @@
     ".microsoft.com", ".windowsupdate.com", ".akamaized.net",
     ".cloudfront.net", ".slack-msgs.com", ".googleapis.com",
     ".gstatic.com", ".steamcontent.com"
+  ],
+  "Suppressions": [
+    { "pattern": "New Listening Port: 6463", "reason": "Discord RPC — expected on this machine" },
+    { "pattern": "Unquoted Service Path*", "reason": "Vendor bug, not exploitable — no write access to intermediate paths" }
   ]
 }

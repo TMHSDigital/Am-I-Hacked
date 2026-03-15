@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.4] - 2026-03-15
+
+### Added
+- **Finding suppression system** -- `Suppressions` array in config lets users acknowledge known-benign findings by title pattern (wildcard `-like` matching). Suppressed count appears in summary box and CI JSON output.
+
 ## [0.4.3] - 2026-03-15
 
 ### Added
