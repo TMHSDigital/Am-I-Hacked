@@ -1,11 +1,6 @@
 <div align="center">
 
-```
-     _   __  __   ___   _  _   _    ___ _  _____ ___  ___
-    /_\ |  \/  | |_ _| | || | /_\  / __| |/ / __|   \|__ \
-   / _ \| |\/| |  | |  | __ |/ _ \| (__| ' <| _|| |) | /_/
-  /_/ \_\_|  |_| |___| |_||_/_/ \_\\___|_|\_\___|___/ (_)
-```
+<img src="assets/banner.png" alt="Am I Hacked?" width="600">
 
 **Zero-dependency Windows security assessment tool.**<br>
 **Finds compromise indicators. Generates an interactive HTML report. Maps everything to MITRE ATT&CK.**
