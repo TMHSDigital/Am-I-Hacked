@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Am I Hacked? - Comprehensive Windows Security Assessment Tool
 .DESCRIPTION
@@ -353,7 +353,7 @@ Write-Host ""
 if ($critCount -gt 0) {
     Write-Host "  ██ CRITICAL findings detected. Review the report immediately." -ForegroundColor Red
 } elseif ($warnCount -eq 0 -and $critCount -eq 0) {
-    Write-Host "  ✓ No threats detected. System appears clean." -ForegroundColor Green
+    Write-Host "  [+] No threats detected. System appears clean." -ForegroundColor Green
 }
 
 Write-Host ""
