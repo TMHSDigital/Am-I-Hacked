@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🔴 Am I Hacked?
+# Am I Hacked?
 
 **Zero-dependency Windows security assessment tool.**<br>
 **Finds compromise indicators. Generates an interactive HTML report. Maps everything to MITRE ATT&CK.**
@@ -10,7 +10,7 @@
 [![PowerShell 5.1+](https://img.shields.io/badge/PowerShell-5.1%2B-5391FE?style=for-the-badge&logo=powershell&logoColor=white)](https://docs.microsoft.com/powershell/)
 [![Windows 10/11](https://img.shields.io/badge/Windows-10%20%2F%2011-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://www.microsoft.com/windows)
 [![License: MIT](https://img.shields.io/badge/License-MIT-22c55e?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-0.3.3-FF6B6B?style=for-the-badge)](#changelog)
+[![Version](https://img.shields.io/badge/Version-0.3.4-FF6B6B?style=for-the-badge)](#changelog)
 
 [![Zero Dependencies](https://img.shields.io/badge/Dependencies-Zero-brightgreen?style=flat-square)](#)
 [![MITRE ATT&CK](https://img.shields.io/badge/MITRE%20ATT%26CK-40%2B%20Techniques-red?style=flat-square&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHRleHQgeD0iMCIgeT0iMTIiIGZvbnQtc2l6ZT0iMTIiPuKalO+4jzwvdGV4dD48L3N2Zz4=)](#mitre-attck-coverage)
@@ -78,6 +78,9 @@ Baselines enable **change detection** — the most powerful signal for catching 
 
 # Custom output directory
 .\AmIHacked.ps1 -OutputPath "C:\SecurityReports"
+
+# Mask operator identity in output (for screenshots / sharing)
+.\AmIHacked.ps1 -Redact
 ```
 
 | Parameter | Description |
@@ -90,6 +93,7 @@ Baselines enable **change detection** — the most powerful signal for catching 
 | `-CreateBaseline` | Snapshot current system state |
 | `-ExportJson` | Emit findings as JSON alongside HTML |
 | `-VerboseOutput` | Enable verbose console output |
+| `-Redact` | Mask operator identity (computer name, username, paths) in all output |
 
 ---
 
@@ -129,7 +133,7 @@ The self-contained HTML report (single file, no external dependencies) includes:
 | Feature | Description |
 |---------|-------------|
 | **Security Score** | Animated SVG donut chart (0–100) based on finding severity |
-| **Verdict Banner** | CLEAN / CAUTION / SUSPICIOUS / THREATS DETECTED |
+| **Verdict Banner** | CLEAN / CAUTION / SUSPICIOUS / COMPROMISED |
 | **MITRE ATT&CK Badges** | Clickable technique IDs linking to attack.mitre.org |
 | **Filterable Findings** | Filter by severity, expand/collapse categories |
 | **Copy-Paste Remediation** | Click any PowerShell command to copy to clipboard |
@@ -181,7 +185,8 @@ Then edit `config/config.json` (gitignored — API keys stay local):
 | `VirusTotalAPIKey` | `string` | VT API key for hash lookups |
 | `AbuseIPDBKey` | `string` | AbuseIPDB key for IP reputation |
 | `SuspiciousParentChild` | `object[]` | Parent→Child process rules |
-| `SuspiciousTempExtensions` | `string[]` | Extensions flagged in temp dirs |
+| `SuspiciousTempExtensions` | `string[]` | Extensions flagged in temp directories |
+| `TrustedAppDirs` | `string[]` | App directory names to skip during temp-dir scanning |
 | `AccountMaxAgeDays` | `int` | Flag accounts created within N days |
 | `FileSystemMaxAgeDays` | `int` | Flag recently modified system executables |
 | `MaxEventLogEntries` | `int` | Max events to scan per log |

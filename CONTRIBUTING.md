@@ -37,7 +37,8 @@ function Invoke-YourModuleNameChecks {
         -Title "Something Suspicious" `
         -Description "Explain what was found and why it matters." `
         -Remediation "Remove-Whatever -Name 'thing'" `
-        -Details @{ Key = "value" }
+        -Details @{ Key = "value" } `
+        -MITRE @("T1547.001")
 
     Write-Status "YourModuleName analysis complete."
 }
@@ -51,6 +52,8 @@ function Invoke-YourModuleNameChecks {
 - **Config access**: Reference `$script:Config` for whitelists and tuning parameters.
 - **Offline mode**: Check `$script:OfflineMode` before making API calls.
 - **No external dependencies**: PowerShell 5.1+ built-in cmdlets only.
+- **MITRE ATT&CK**: Every finding should include a `-MITRE @("T1xxx.xxx")` array of relevant technique IDs.
+- **Redaction**: Handled automatically by `Add-Finding`. Module authors do not need to mask sensitive data.
 
 ## Running the Test Harness
 

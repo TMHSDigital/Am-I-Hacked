@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.4] - 2026-03-15
+
+### Added
+- **`-Redact` switch** -- masks operator identity (computer name, username, domain, profile paths) in console output, HTML reports, and JSON exports; useful for screenshots and sharing reports publicly
+- `Invoke-Redact` and `Invoke-RedactObject` helper functions in `lib/Helpers.ps1`
+
+### Changed
+- **Documentation overhaul** -- fixed incorrect API key names in CLAUDE.md (`vtApiKey` -> `VirusTotalAPIKey`, `abuseIpDbApiKey` -> `AbuseIPDBKey`), fixed `MitreAttack` -> `MITRE` field name, added missing config keys (`TrustedAppDirs`, `SuspiciousTempExtensions`) to README, fixed verdict label (`THREATS DETECTED` -> `COMPROMISED`), added `-MITRE` to CONTRIBUTING.md example
+- Removed emoji from README heading
+- Version bumped to 0.3.4
+
 ## [0.3.3] - 2026-03-15 -- Public Release
 
 ### Added

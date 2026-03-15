@@ -117,6 +117,44 @@ function Write-SectionEnd {
     }
 }
 
+# ── Redaction ────────────────────────────────────────────────────────────────
+
+function Invoke-Redact {
+    param([string]$Text)
+    if (-not $script:RedactMode -or -not $Text) { return $Text }
+    foreach ($key in $script:RedactMap.Keys) {
+        $Text = $Text -replace [regex]::Escape($key), $script:RedactMap[$key]
+    }
+    return $Text
+}
+
+function Invoke-RedactObject {
+    param([object]$Obj)
+    if (-not $script:RedactMode -or $null -eq $Obj) { return $Obj }
+
+    if ($Obj -is [string]) {
+        return Invoke-Redact $Obj
+    }
+    if ($Obj -is [hashtable]) {
+        $result = @{}
+        foreach ($k in $Obj.Keys) {
+            $result[$k] = Invoke-RedactObject $Obj[$k]
+        }
+        return $result
+    }
+    if ($Obj -is [System.Collections.IList]) {
+        return @($Obj | ForEach-Object { Invoke-RedactObject $_ })
+    }
+    if ($Obj -is [PSCustomObject]) {
+        $result = [PSCustomObject]@{}
+        foreach ($prop in $Obj.PSObject.Properties) {
+            $result | Add-Member -NotePropertyName $prop.Name -NotePropertyValue (Invoke-RedactObject $prop.Value)
+        }
+        return $result
+    }
+    return $Obj
+}
+
 # ── Finding Management ───────────────────────────────────────────────────────
 
 function Add-Finding {
@@ -130,6 +168,11 @@ function Add-Finding {
         [object]$Details = $null,
         [string[]]$MITRE = @()
     )
+
+    $Title       = Invoke-Redact $Title
+    $Description = Invoke-Redact $Description
+    $Remediation = Invoke-Redact $Remediation
+    $Details     = Invoke-RedactObject $Details
 
     $finding = [PSCustomObject]@{
         Severity    = $Severity

@@ -27,6 +27,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Export findings as JSON
 .\AmIHacked.ps1 -ExportJson
 
+# Mask operator identity in all output
+.\AmIHacked.ps1 -Redact
+
 # Run the test harness (creates mock IOCs, validates detections)
 .\tests\Invoke-MockScan.ps1
 
@@ -49,7 +52,7 @@ There is no formal CI system — testing is done manually via the mock scan harn
 
 ### Finding System
 
-All modules feed into a global `$script:Findings` ArrayList via the `Add-Finding` helper in `lib/Helpers.ps1`. Each finding carries: `Severity` (CRITICAL/WARNING/INFO), `Category`, `Title`, `Description`, `Remediation`, `Details`, and `MitreAttack` technique IDs.
+All modules feed into a global `$script:Findings` ArrayList via the `Add-Finding` helper in `lib/Helpers.ps1`. Each finding carries: `Severity` (CRITICAL/WARNING/INFO), `Category`, `Title`, `Description`, `Remediation`, `Details`, and `MITRE` (string array of technique IDs).
 
 ### Module System
 
@@ -69,7 +72,7 @@ Adding a new `modules/Check-Foo.ps1` with `Invoke-FooChecks` is all that's neede
 Copied from `config/config.example.json`. Controls:
 - Trusted company/publisher whitelists
 - Trusted IP/domain whitelists
-- Optional API keys: VirusTotal (`vtApiKey`), AbuseIPDB (`abuseIpDbApiKey`)
+- Optional API keys: VirusTotal (`VirusTotalAPIKey`), AbuseIPDB (`AbuseIPDBKey`)
 - Suspicious parent→child process rules
 - Per-module tuning parameters
 
@@ -78,6 +81,19 @@ Copied from `config/config.example.json`. Controls:
 ### Baseline System
 
 `-CreateBaseline` snapshots ports, services, accounts, Run keys, scheduled tasks, and Defender exclusions to JSON. Baselines are **never auto-overwritten** — this is intentional to prevent a compromised system from poisoning its own baseline.
+
+### Redaction System
+
+`-Redact` masks operator identity (computer name, username, domain, profile paths) in all output. Implemented via two functions in `lib/Helpers.ps1`:
+
+- `Invoke-Redact` — string replacement using `$script:RedactMap` (populated in `AmIHacked.ps1` bootstrap)
+- `Invoke-RedactObject` — recursively redacts strings in hashtables, arrays, and PSCustomObjects
+
+Redaction is applied at two choke points:
+1. `Add-Finding` — redacts Title, Description, Remediation, and Details before storing/printing
+2. `$script:SystemInfo` — redacts ComputerName, UserName, Domain after collection
+
+Individual modules do not need to handle redaction.
 
 ## Module Overview
 

@@ -26,6 +26,9 @@
     Emit findings as a JSON file alongside the HTML report.
 .PARAMETER VerboseOutput
     Enable verbose console output during scan
+.PARAMETER Redact
+    Mask the operator's identity (computer name, username, domain, profile path) in console output,
+    HTML reports, and JSON exports. Useful for screenshots or sharing reports publicly.
 .NOTES
     Author: TM Hospitality Strategies / Am I Hacked Project
     License: MIT
@@ -42,7 +45,8 @@ param(
     [string]$BaselinePath,
     [switch]$CreateBaseline,
     [switch]$ExportJson,
-    [switch]$VerboseOutput
+    [switch]$VerboseOutput,
+    [switch]$Redact
 )
 
 # ── Bootstrap ────────────────────────────────────────────────────────────────
@@ -53,8 +57,10 @@ $script:Findings = [System.Collections.ArrayList]::new()
 $script:SystemInfo = @{}
 $script:Config = @{}
 $script:OfflineMode = $Offline.IsPresent
+$script:RedactMode = $Redact.IsPresent
+$script:RedactMap = @{}
 
-$script:Version = "0.3.3"
+$script:Version = "0.3.4"
 
 # ── Helpers (loaded first) ───────────────────────────────────────────────────
 
@@ -70,6 +76,20 @@ if (Test-Path $ConfigPath) {
     }
 } else {
     $script:Config = Get-DefaultConfig
+}
+
+# ── Redact Map ───────────────────────────────────────────────────────────────
+
+if ($script:RedactMode) {
+    $script:RedactMap = @{}
+    $rUser = $env:USERNAME
+    $rComp = $env:COMPUTERNAME
+    $rDomain = $env:USERDOMAIN
+    if ($rUser)   { $script:RedactMap[$rUser]   = "REDACTED-USER" }
+    if ($rComp)   { $script:RedactMap[$rComp]   = "REDACTED-PC" }
+    if ($rDomain -and $rDomain -ne $rComp) {
+        $script:RedactMap[$rDomain] = "REDACTED-DOMAIN"
+    }
 }
 
 # ── Admin Check ──────────────────────────────────────────────────────────────
@@ -94,6 +114,10 @@ if ($script:OfflineMode) {
     Write-Status "OFFLINE MODE: API integrations disabled." -Color Yellow
 }
 
+if ($script:RedactMode) {
+    Write-Status "REDACT MODE: Sensitive identifiers will be masked." -Color Yellow
+}
+
 if (-not $isAdmin) {
     Write-Status "Running without admin - some checks will be limited." -Color Yellow
     Add-Finding -Severity "INFO" -Category "General" -Title "Not Running as Administrator" `
@@ -116,6 +140,12 @@ $script:SystemInfo = @{
     IsAdmin      = $isAdmin
     ScanTime     = $script:StartTime
     PSVersion    = $PSVersionTable.PSVersion.ToString()
+}
+
+if ($script:RedactMode) {
+    $script:SystemInfo.ComputerName = Invoke-Redact $script:SystemInfo.ComputerName
+    $script:SystemInfo.UserName     = Invoke-Redact $script:SystemInfo.UserName
+    $script:SystemInfo.Domain       = Invoke-Redact $script:SystemInfo.Domain
 }
 
 # ── Baseline Comparison ──────────────────────────────────────────────────────
