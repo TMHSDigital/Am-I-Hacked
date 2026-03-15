@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.7] - 2026-03-15
+
+### Added
+- **Startup folder persistence check** -- scans per-user and all-user startup folders for executables, scripts, and shortcuts (WARNING, T1547.001)
+
+### Fixed
+- **22 empty catch blocks** replaced with `Write-Verbose` across Check-Accounts.ps1, Check-DefenseEvasion.ps1, Check-FileSystem.ps1, and lib/Helpers.ps1 so failures are traceable with `-Verbose`
+- **Report filterFindings JS bug** -- implicit `event.target` replaced with explicit button element parameter, fixing potential strict-mode errors
+- **Redundant if/else in Check-FileSystem.ps1** -- collapsed identical branches for trusted-company severity assignment
+
 ## [0.4.6] - 2026-03-15
 
 ### Added

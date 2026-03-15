@@ -133,11 +133,7 @@ function Invoke-FileSystemChecks {
                     } elseif ($hasValidSig) {
                         $severity = "INFO"
                     } elseif ($versionInfo -and (Test-IsTrustedCompany $versionInfo.CompanyName)) {
-                        if ($inTrustedDir) {
-                            $severity = "WARNING"
-                        } else {
-                            $severity = "WARNING"
-                        }
+                        $severity = "WARNING"
                     } elseif (-not $hasValidSig) {
                         if ($inTrustedDir) {
                             $severity = "WARNING"
@@ -302,7 +298,9 @@ function Invoke-FileSystemChecks {
                         -MITRE @("T1564.004")
                 }
             }
-        } catch {}
+        } catch {
+            Write-Verbose "Could not scan alternate data streams in $dir : $_"
+        }
     }
 
     if ($adsCount -eq 0) {
@@ -338,7 +336,9 @@ function Invoke-FileSystemChecks {
                     } `
                     -MITRE @("T1555.003","T1560.001")
             }
-        } catch {}
+        } catch {
+            Write-Verbose "Could not scan browser profile '$profileDir': $_"
+        }
     }
 
     $stealerPatterns = @("passwords.txt", "credentials.txt", "wallets.txt", "cookies.txt", "autofill.txt", "credit_cards.txt")
@@ -356,7 +356,9 @@ function Invoke-FileSystemChecks {
                     -MITRE @("T1555","T1005")
             }
         }
-    } catch {}
+    } catch {
+        Write-Verbose "Could not check info-stealer artifacts in temp: $_"
+    }
 
     $walletPaths = @(
         "$env:APPDATA\Electrum\wallets",
@@ -379,7 +381,9 @@ function Invoke-FileSystemChecks {
                     -Details @{ Path = $wp; FilesAccessed = $recentAccess.Count } `
                     -MITRE @("T1005","T1555")
             }
-        } catch {}
+        } catch {
+            Write-Verbose "Could not check wallet file access at '$wp': $_"
+        }
     }
 
     # ── 6. Persistence via Common Autorun Locations ──────────────────────
@@ -449,7 +453,44 @@ function Invoke-FileSystemChecks {
                         -MITRE @("T1547.001")
                 }
             }
-        } catch {}
+        } catch {
+            Write-Verbose "Could not read autorun key '$key': $_"
+        }
+    }
+
+    # ── 6b. Startup Folder Executables ───────────────────────────────────
+
+    Write-Status "Checking startup folder contents..."
+
+    $startupFolders = @(
+        "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup",
+        "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\StartUp"
+    )
+    $startupExtensions = @('.exe', '.bat', '.cmd', '.vbs', '.ps1', '.lnk')
+
+    foreach ($startupFolder in $startupFolders) {
+        if (-not (Test-Path $startupFolder)) { continue }
+        try {
+            $startupItems = Get-ChildItem $startupFolder -File -ErrorAction SilentlyContinue |
+                Where-Object { $startupExtensions -contains $_.Extension.ToLower() }
+
+            foreach ($item in $startupItems) {
+                Add-Finding -Severity "WARNING" -Category "FileSystem" `
+                    -Title "Startup Folder Entry: $($item.Name)" `
+                    -Description "Found '$($item.Name)' in startup folder '$startupFolder'. Files placed here execute automatically at user logon. Verify this is a legitimate application." `
+                    -Remediation "If unexpected, remove: Remove-Item '$($item.FullName)'" `
+                    -Details @{
+                        Path     = $item.FullName
+                        Folder   = $startupFolder
+                        Size     = Format-ByteSize $item.Length
+                        Modified = $item.LastWriteTime
+                        Created  = $item.CreationTime
+                    } `
+                    -MITRE @("T1547.001")
+            }
+        } catch {
+            Write-Verbose "Could not scan startup folder '$startupFolder': $_"
+        }
     }
 
     # ── 7. Advanced Persistence: IFEO, AppInit_DLLs, Winlogon ────────────
@@ -474,7 +515,9 @@ function Invoke-FileSystemChecks {
                     -MITRE @("T1546.012")
             }
         }
-    } catch {}
+    } catch {
+        Write-Verbose "Could not check IFEO debugger keys: $_"
+    }
 
     try {
         $appInitReg = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Windows" -ErrorAction SilentlyContinue
@@ -486,7 +529,9 @@ function Invoke-FileSystemChecks {
                 -Details @{ DLLs = $appInitReg.AppInit_DLLs; LoadEnabled = $appInitReg.LoadAppInit_DLLs } `
                 -MITRE @("T1546.010")
         }
-    } catch {}
+    } catch {
+        Write-Verbose "Could not check AppInit_DLLs: $_"
+    }
 
     try {
         $winlogon = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -ErrorAction SilentlyContinue
@@ -510,7 +555,9 @@ function Invoke-FileSystemChecks {
                     -MITRE @("T1547.004")
             }
         }
-    } catch {}
+    } catch {
+        Write-Verbose "Could not check Winlogon keys: $_"
+    }
 
     # ── 8. COM Hijacking ─────────────────────────────────────────────────
 
@@ -559,9 +606,13 @@ function Invoke-FileSystemChecks {
                         } `
                         -MITRE @("T1546.015")
                 }
-            } catch {}
+            } catch {
+                Write-Verbose "Could not inspect CLSID '$($clsid.PSChildName)': $_"
+            }
         }
-    } catch {}
+    } catch {
+        Write-Verbose "Could not enumerate HKCU COM CLSID keys: $_"
+    }
 
     # ── 9. WMI Persistence ───────────────────────────────────────────────
 
@@ -635,7 +686,9 @@ function Invoke-FileSystemChecks {
                     -MITRE @("T1546.003")
             }
         }
-    } catch {}
+    } catch {
+        Write-Verbose "Could not enumerate WMI namespaces: $_"
+    }
 
     # ── 10. Scheduled Tasks Check ────────────────────────────────────────
 
@@ -706,7 +759,9 @@ function Invoke-FileSystemChecks {
                             -MITRE @("T1053.005")
                     }
                 }
-            } catch {}
+            } catch {
+                Write-Verbose "Could not inspect task '$($task.TaskName)': $_"
+            }
         }
     } catch {
         Write-Status "Could not enumerate scheduled tasks." -Color Yellow
@@ -722,7 +777,9 @@ function Invoke-FileSystemChecks {
             $apiTaskNames = @()
             try {
                 $apiTaskNames = Get-ScheduledTask -ErrorAction SilentlyContinue | ForEach-Object { $_.TaskName }
-            } catch {}
+            } catch {
+                Write-Verbose "Could not enumerate scheduled tasks via API: $_"
+            }
 
             function Walk-TaskCache {
                 param([string]$Path, [string]$TaskPathPrefix)

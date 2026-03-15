@@ -745,10 +745,10 @@ function Generate-HtmlReport {
         </div>
 
         <div class="filter-bar">
-            <button class="filter-btn active" onclick="filterFindings('all')">All ($totalCount)</button>
-            <button class="filter-btn" onclick="filterFindings('critical')">Critical ($critCount)</button>
-            <button class="filter-btn" onclick="filterFindings('warning')">Warning ($warnCount)</button>
-            <button class="filter-btn" onclick="filterFindings('info')">Info ($infoCount)</button>
+            <button class="filter-btn active" onclick="filterFindings(this, 'all')">All ($totalCount)</button>
+            <button class="filter-btn" onclick="filterFindings(this, 'critical')">Critical ($critCount)</button>
+            <button class="filter-btn" onclick="filterFindings(this, 'warning')">Warning ($warnCount)</button>
+            <button class="filter-btn" onclick="filterFindings(this, 'info')">Info ($infoCount)</button>
         </div>
 
         ${findingsHtml}
@@ -780,9 +780,9 @@ function Generate-HtmlReport {
             }
         }
 
-        function filterFindings(level) {
+        function filterFindings(btn, level) {
             document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-            event.target.classList.add('active');
+            btn.classList.add('active');
             document.querySelectorAll('.finding').forEach(f => {
                 f.style.display = (level === 'all' || f.dataset.severity === level) ? 'block' : 'none';
             });

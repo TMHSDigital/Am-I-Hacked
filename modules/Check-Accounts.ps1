@@ -204,7 +204,9 @@ function Invoke-AccountsChecks {
                 } `
                 -MITRE @("T1021.001")
         }
-    } catch {}
+    } catch {
+        Write-Verbose "Could not read RDP session history: $_"
+    }
 
     # ── 5. Event Log Clearing Detection ──────────────────────────────────
 
@@ -240,7 +242,9 @@ function Invoke-AccountsChecks {
                     -MITRE @("T1070.001")
             }
         }
-    } catch {}
+    } catch {
+        Write-Verbose "Could not check event log clearing events: $_"
+    }
 
     # ── 6. Credential Dumping Artifacts ──────────────────────────────────
 
@@ -315,6 +319,8 @@ function Invoke-AccountsChecks {
                 -Remediation "Enable LSA Protection: Set registry HKLM\SYSTEM\CurrentControlSet\Control\Lsa\RunAsPPL to 1 and reboot." `
                 -MITRE @("T1003.001")
         }
-    } catch {}
+    } catch {
+        Write-Verbose "Could not check LSA protection: $_"
+    }
 
 }

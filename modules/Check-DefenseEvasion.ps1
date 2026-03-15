@@ -61,7 +61,9 @@ function Invoke-DefenseEvasionChecks {
                 -Details @{ Key = "HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender"; Value = 1 } `
                 -MITRE @("T1562.001")
         }
-    } catch {}
+    } catch {
+        Write-Verbose "Could not check Defender DisableAntiSpyware policy: $_"
+    }
 
     $amsiDll = "$env:SystemRoot\System32\amsi.dll"
     if (Test-Path $amsiDll) {
@@ -87,7 +89,9 @@ function Invoke-DefenseEvasionChecks {
                 -Remediation "Re-register Windows Defender as an AMSI provider. Run 'sfc /scannow' and ensure Defender is properly installed." `
                 -MITRE @("T1562.001")
         }
-    } catch {}
+    } catch {
+        Write-Verbose "Could not enumerate AMSI providers: $_"
+    }
 
     try {
         $amsiEnable = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows Script\Settings" -Name "AmsiEnable" -ErrorAction SilentlyContinue
@@ -99,7 +103,9 @@ function Invoke-DefenseEvasionChecks {
                 -Details @{ Key = "HKLM:\SOFTWARE\Microsoft\Windows Script\Settings\AmsiEnable"; Value = 0 } `
                 -MITRE @("T1562.001")
         }
-    } catch {}
+    } catch {
+        Write-Verbose "Could not check AMSI Windows Script Settings: $_"
+    }
 
     try {
         $sbl = Get-ItemProperty "HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging" -ErrorAction SilentlyContinue
@@ -111,7 +117,9 @@ function Invoke-DefenseEvasionChecks {
                 -Details @{ Key = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging\EnableScriptBlockLogging"; Value = "absent or 0" } `
                 -MITRE @("T1562.002")
         }
-    } catch {}
+    } catch {
+        Write-Verbose "Could not check ScriptBlockLogging policy: $_"
+    }
 
     # ── 3. Windows Defender Real-Time Protection ─────────────────────────
 
@@ -169,7 +177,9 @@ function Invoke-DefenseEvasionChecks {
                 -Details @{ CurrentValue = $etwSecurity.Start; ExpectedValue = 1 } `
                 -MITRE @("T1562.002")
         }
-    } catch {}
+    } catch {
+        Write-Verbose "Could not check ETW Security autologger: $_"
+    }
 
     try {
         $disabledLoggers = @(
@@ -186,7 +196,9 @@ function Invoke-DefenseEvasionChecks {
                     -MITRE @("T1562.002")
             }
         }
-    } catch {}
+    } catch {
+        Write-Verbose "Could not check ETW Application/System autologgers: $_"
+    }
 
     # ── 5. Tamper Protection Check ───────────────────────────────────────
 
@@ -201,6 +213,8 @@ function Invoke-DefenseEvasionChecks {
                 -Remediation "Enable Tamper Protection through Windows Security > Virus & threat protection settings." `
                 -MITRE @("T1562.001")
         }
-    } catch {}
+    } catch {
+        Write-Verbose "Could not check Defender TamperProtection: $_"
+    }
 
 }

@@ -539,7 +539,9 @@ function Compare-Baseline {
             } else {
                 $baselineAge = " ($([math]::Floor($age.TotalHours))h ago)"
             }
-        } catch {}
+        } catch {
+            Write-Verbose "Could not parse baseline timestamp: $_"
+        }
 
         Write-Status "Baseline: $($old.Timestamp)$baselineAge" -Color Gray
 
@@ -605,7 +607,9 @@ function Compare-Baseline {
                             -MITRE @("T1547.001")
                     }
                 }
-            } catch {}
+            } catch {
+                Write-Verbose "Could not read Run key '$keyPath' for baseline comparison: $_"
+            }
         }
 
         Write-Status "Baseline comparison complete."
