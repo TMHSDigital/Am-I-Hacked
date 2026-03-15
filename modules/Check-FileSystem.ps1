@@ -106,6 +106,7 @@ function Invoke-FileSystemChecks {
 
             foreach ($file in $files) {
                 if ($file.Name -match '^ps-script-[0-9a-f\-]+\.ps1$') { continue }
+                if ($file.Name -match '^remoteIpMoProxy_') { continue }  # PS implicit remoting proxy — scanner artifact
 
                 $inTrustedDir = $false
                 foreach ($pattern in $trustedAppDirs) {
@@ -542,10 +543,8 @@ function Invoke-FileSystemChecks {
                 }
 
                 if ($dllPath -notmatch "^C:\\Windows\\" -and $dllPath -notmatch "^C:\\Program Files") {
-                    $comSig = $null
-                    if (Test-Path $dllPath) {
-                        $comSig = Get-FileSignature -FilePath $dllPath
-                    }
+                    if (-not (Test-Path $dllPath)) { continue }  # stale registration — file gone, can't be exploited
+                    $comSig = Get-FileSignature -FilePath $dllPath
                     if ($comSig -and $comSig.Status -eq "Valid") { continue }
 
                     Add-Finding -Severity "WARNING" -Category "FileSystem" `
@@ -646,23 +645,42 @@ function Invoke-FileSystemChecks {
         $tasks = Get-ScheduledTask -ErrorAction SilentlyContinue |
             Where-Object { $_.State -ne "Disabled" }
 
+        $knownLegitTaskPaths = @(
+            "*\OneDrive\*\OneDriveLauncher.exe*",
+            "*\OneDrive*\OneDriveStandaloneUpdater.exe*",
+            "*\Opera\autoupdate\opera_autoupdate.exe*",
+            "*\Zoom\bin\Zoom.exe*",
+            "*\Discord\Update.exe*",
+            "*\Teams\*\Teams.exe*",
+            "*\Update.exe*--processStart*"
+        )
+
         foreach ($task in $tasks) {
             try {
                 $actions = $task.Actions
                 foreach ($action in $actions) {
                     $execute = $action.Execute
                     if (-not $execute) { continue }
+                    $taskArgs = $action.Arguments
 
                     $suspicious = $false
                     $severity = "INFO"
+
+                    # Known-legitimate updater paths
+                    $isKnownLegit = $false
+                    foreach ($pattern in $knownLegitTaskPaths) {
+                        if ($execute -like $pattern -or "$execute $taskArgs" -like $pattern) {
+                            $isKnownLegit = $true; break
+                        }
+                    }
+                    if ($isKnownLegit) { continue }
 
                     if ($execute -match "\\Temp\\" -or $execute -match "\\AppData\\") {
                         $suspicious = $true
                         $severity = "WARNING"
                     }
 
-                    $args = $action.Arguments
-                    if ($execute -match "powershell" -and $args -match "-enc|-e |-WindowStyle\s+Hidden") {
+                    if ($execute -match "powershell" -and $taskArgs -match "-enc|-e |-WindowStyle\s+Hidden") {
                         $suspicious = $true
                         $severity = "CRITICAL"
                     }
@@ -675,13 +693,13 @@ function Invoke-FileSystemChecks {
                     if ($suspicious) {
                         Add-Finding -Severity $severity -Category "FileSystem" `
                             -Title "Suspicious Scheduled Task: $($task.TaskName)" `
-                            -Description "Scheduled task '$($task.TaskName)' (Path: $($task.TaskPath)) executes: '$execute' with arguments: '$args'. This task runs as: $($task.Principal.UserId)." `
+                            -Description "Scheduled task '$($task.TaskName)' (Path: $($task.TaskPath)) executes: '$execute' with arguments: '$taskArgs'. This task runs as: $($task.Principal.UserId)." `
                             -Remediation "If you don't recognize this task, disable it: Disable-ScheduledTask -TaskName '$($task.TaskName)' -TaskPath '$($task.TaskPath)'" `
                             -Details @{
                                 TaskName = $task.TaskName
                                 TaskPath = $task.TaskPath
                                 Execute = $execute
-                                Arguments = $args
+                                Arguments = $taskArgs
                                 RunAs = $task.Principal.UserId
                                 State = $task.State.ToString()
                             } `
