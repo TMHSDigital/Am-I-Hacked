@@ -1,6 +1,5 @@
 # Reports (contain sensitive system info)
-reports/*.html
-reports/*.json
+reports/
 
 # User config with API keys
 config/config.json

@@ -95,7 +95,7 @@ if ($script:OfflineMode) {
 }
 
 if (-not $isAdmin) {
-    Write-Status "Running without admin — some checks will be limited." -Color Yellow
+    Write-Status "Running without admin - some checks will be limited." -Color Yellow
     Add-Finding -Severity "INFO" -Category "General" -Title "Not Running as Administrator" `
         -Description "Some checks require elevated privileges for full results. Re-run as Administrator for comprehensive analysis." `
         -Remediation "Right-click PowerShell > Run as Administrator, then re-run this script."
