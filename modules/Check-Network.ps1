@@ -63,7 +63,9 @@ function Invoke-NetworkChecks {
                         $severity = "INFO"
                     }
                 }
-            } catch {}
+            } catch {
+                Write-Verbose "Reverse-DNS lookup failed for ${ip}: $_"
+            }
 
             Add-Finding -Severity $severity -Category "Network" `
                 -Title "High Connection Count to $ip ($($connList.Count) connections)" `
@@ -131,7 +133,9 @@ function Invoke-NetworkChecks {
                         } `
                         -MITRE @("T1071.001")
                 }
-            } catch {}
+            } catch {
+                Write-Status "AbuseIPDB lookup failed for ${ip}: $_" -Color Yellow
+            }
         }
         Write-Status "Checked $checkedCount IPs against AbuseIPDB."
     } elseif ($script:OfflineMode -and $externalIPs.Count -gt 0) {

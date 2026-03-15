@@ -80,7 +80,7 @@ if ($script:NonInteractive) {
 $script:RedactMap = @{}
 $script:SuppressedCount = 0
 
-$script:Version = "0.4.5"
+$script:Version = "0.4.6"
 
 # ── Helpers (loaded first) ───────────────────────────────────────────────────
 
@@ -92,6 +92,7 @@ if (Test-Path $ConfigPath) {
     try {
         $script:Config = Get-Content $ConfigPath -Raw | ConvertFrom-Json
     } catch {
+        Write-Warning "Failed to parse config at '$ConfigPath': $_. Using built-in defaults."
         $script:Config = Get-DefaultConfig
     }
 } else {

@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.6] - 2026-03-15
+
+### Added
+- **ServiceWhitelist implementation** -- `ServiceWhitelist` config field is now applied in Check-Processes.ps1 service analysis, skipping whitelisted services from unquoted-path, user-directory, and SYSTEM-outside-standard-dirs checks
+- **Test assertions** -- `Assert-FindingCount` helper, double-extension detection assertion, category coverage checks, severity/remediation/MITRE field validation, CIMode JSON `suppressed` key check
+
+### Fixed
+- **Error handling** -- replaced empty `catch {}` blocks with `Write-Verbose`/`Write-Status`/`Write-Warning` in Check-Network.ps1 (DNS reverse-lookup, AbuseIPDB), lib/Helpers.ps1 (Run key enumeration), and AmIHacked.ps1 (config parse fallback)
+- **`New-DefaultConfig` `$PSScriptRoot` fix** -- default path now resolves via `Split-Path $PSScriptRoot -Parent` at call-time instead of during `param()` evaluation (which pointed to `lib/` instead of project root)
+
 ## [0.4.5] - 2026-03-15
 
 ### Fixed

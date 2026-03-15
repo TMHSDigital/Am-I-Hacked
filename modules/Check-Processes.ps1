@@ -12,6 +12,11 @@ function Invoke-ProcessesChecks {
         $whitelist = $script:Config.ProcessWhitelist | ForEach-Object { $_.ToLower() }
     }
 
+    $serviceWhitelist = @()
+    if ($script:Config.ServiceWhitelist) {
+        $serviceWhitelist = $script:Config.ServiceWhitelist | ForEach-Object { $_.ToLower() }
+    }
+
     $processCount = 0
     $flaggedCount = 0
 
@@ -188,6 +193,7 @@ function Invoke-ProcessesChecks {
     foreach ($svc in $services) {
         $svcPath = $svc.PathName
         if (-not $svcPath) { continue }
+        if ($serviceWhitelist -contains $svc.Name.ToLower()) { continue }
 
         if ($svcPath -match "\\Temp\\" -or $svcPath -match "\\AppData\\" -or $svcPath -match "\\Users\\[^\\]+\\Desktop\\") {
             Add-Finding -Severity "CRITICAL" -Category "Process" `

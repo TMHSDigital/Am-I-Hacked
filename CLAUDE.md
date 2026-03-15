@@ -138,5 +138,5 @@ $summary = $jsonLine | ConvertFrom-Json
 
 ## Code Conventions
 
-- All `.ps1` files **must** be saved with UTF-8 BOM (`EF BB BF`). PowerShell 5.1 defaults to Windows-1252, which misinterprets multi-byte UTF-8 sequences (e.g. `✓`, `╔`) as string delimiters, causing parse errors. **Some edit tools strip BOM on save** -- run `.\fix-bom.ps1` (gitignored dev utility) to re-apply after editing.
+- All `.ps1` files **must** be saved with UTF-8 BOM (`EF BB BF`). PowerShell 5.1 defaults to Windows-1252, which misinterprets multi-byte UTF-8 sequences (e.g. `✓`, `╔`) as string delimiters, causing parse errors. **Some edit tools strip BOM on save** -- run `.\fix-bom.ps1` to re-apply after editing.
 - See `CONTRIBUTING.md` for the full module authoring guide and test harness documentation.

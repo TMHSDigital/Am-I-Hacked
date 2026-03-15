@@ -43,6 +43,23 @@ function Assert-FindingExists {
     }
 }
 
+function Assert-FindingCount {
+    param(
+        [object[]]$Findings,
+        [string]$Category,
+        [int]$MinCount,
+        [string]$TestName
+    )
+    $count = ($Findings | Where-Object { $_.Category -eq $Category }).Count
+    if ($count -ge $MinCount) {
+        Write-Host "  [PASS] $TestName ($count findings in '$Category')" -ForegroundColor Green
+        $script:TestsPassed++
+    } else {
+        Write-Host "  [FAIL] $TestName — expected >= $MinCount in '$Category', got $count" -ForegroundColor Red
+        $script:TestsFailed++
+    }
+}
+
 # ── Setup: Create mock artifacts ─────────────────────────────────────────────
 
 Write-Host "`n  ╔══════════════════════════════════════════╗" -ForegroundColor Magenta
@@ -112,6 +129,46 @@ if (-not $jsonFiles) {
 
     Assert-FindingExists -Findings $findings -TitlePattern "Stealer Output File.*passwords" -TestName "Detected stealer output file pattern"
 
+    Assert-FindingExists -Findings $findings -TitlePattern "Double Extension.*\.exe" -TestName "Detected double-extension file (invoice.pdf.exe)"
+
+    # Category coverage: each active module should produce at least one finding
+    Write-TestHeader "Module Coverage"
+    Assert-FindingCount -Findings $findings -Category "FileSystem" -MinCount 1 -TestName "FileSystem module produced findings"
+    Assert-FindingCount -Findings $findings -Category "General"    -MinCount 1 -TestName "General module produced findings"
+
+    # Severity field is always one of the three valid values
+    Write-TestHeader "Severity Field Validity"
+    $invalidSeverity = $findings | Where-Object { $_.Severity -notin @("CRITICAL","WARNING","INFO") }
+    if ($invalidSeverity.Count -eq 0) {
+        Write-Host "  [PASS] All $($findings.Count) findings have valid Severity" -ForegroundColor Green
+        $script:TestsPassed++
+    } else {
+        Write-Host "  [FAIL] $($invalidSeverity.Count) findings have invalid Severity: $(($invalidSeverity | Select-Object -ExpandProperty Severity) -join ', ')" -ForegroundColor Red
+        $script:TestsFailed++
+    }
+
+    # Every finding has non-empty Remediation
+    Write-TestHeader "Remediation Field Coverage"
+    $noRemediation = $findings | Where-Object { -not $_.Remediation }
+    if ($noRemediation.Count -eq 0) {
+        Write-Host "  [PASS] All findings have Remediation text" -ForegroundColor Green
+        $script:TestsPassed++
+    } else {
+        Write-Host "  [FAIL] $($noRemediation.Count) findings missing Remediation: $(($noRemediation | Select-Object -First 3 -ExpandProperty Title) -join '; ')" -ForegroundColor Red
+        $script:TestsFailed++
+    }
+
+    # Every finding has at least one MITRE tag
+    Write-TestHeader "MITRE Tag Coverage"
+    $noMitre = $findings | Where-Object { -not $_.MITRE -or $_.MITRE.Count -eq 0 }
+    if ($noMitre.Count -eq 0) {
+        Write-Host "  [PASS] All findings have MITRE ATT&CK tags" -ForegroundColor Green
+        $script:TestsPassed++
+    } else {
+        Write-Host "  [FAIL] $($noMitre.Count) findings missing MITRE tags: $(($noMitre | Select-Object -First 3 -ExpandProperty Title) -join '; ')" -ForegroundColor Red
+        $script:TestsFailed++
+    }
+
     # Check that JSON structure is valid
     Write-TestHeader "JSON Structure Validation"
     if ($results.Version -and $results.SystemInfo -and $results.Findings -and $results.Duration) {
@@ -119,17 +176,6 @@ if (-not $jsonFiles) {
         $script:TestsPassed++
     } else {
         Write-Host "  [FAIL] JSON structure missing required fields" -ForegroundColor Red
-        $script:TestsFailed++
-    }
-
-    # Check MITRE tags are present on findings
-    Write-TestHeader "MITRE ATT&CK Tags"
-    $mitreTagged = $findings | Where-Object { $_.MITRE -and $_.MITRE.Count -gt 0 }
-    if ($mitreTagged -and $mitreTagged.Count -gt 0) {
-        Write-Host "  [PASS] $($mitreTagged.Count) findings have MITRE ATT&CK tags" -ForegroundColor Green
-        $script:TestsPassed++
-    } else {
-        Write-Host "  [FAIL] No findings have MITRE ATT&CK tags" -ForegroundColor Red
         $script:TestsFailed++
     }
 
@@ -206,7 +252,8 @@ if (-not $jsonFiles) {
         try {
             $ciSummary = $jsonLine | ConvertFrom-Json
             if ($ciSummary.verdict -and $null -ne $ciSummary.critical -and $null -ne $ciSummary.warning -and
-                $null -ne $ciSummary.info -and $null -ne $ciSummary.total -and $ciSummary.reportPath) {
+                $null -ne $ciSummary.info -and $null -ne $ciSummary.suppressed -and
+                $null -ne $ciSummary.total -and $ciSummary.reportPath) {
                 Write-Host "  [PASS] CIMode JSON summary contains all required fields" -ForegroundColor Green
                 $script:TestsPassed++
             } else {

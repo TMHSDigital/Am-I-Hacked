@@ -297,7 +297,11 @@ function Get-DefaultConfig {
 }
 
 function New-DefaultConfig {
-    param([string]$Path = (Join-Path $PSScriptRoot "config\config.json"))
+    param([string]$Path = "")
+    if (-not $Path) {
+        $repoRoot = Split-Path $PSScriptRoot -Parent
+        $Path = Join-Path $repoRoot "config\config.json"
+    }
 
     $dir = Split-Path $Path -Parent
     if (-not (Test-Path $dir)) {
@@ -487,7 +491,9 @@ function Export-Baseline {
                                 @{ Key = $key; Name = $_.Name; Value = $_.Value }
                             }
                         }
-                    } catch {}
+                    } catch {
+                        Write-Verbose "Could not read Run key '${key}': $_"
+                    }
                 }
             )
 
