@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.5] - 2026-03-15
+
+### Fixed
+- **README CI JSON example** -- updated to include `suppressed` key and correct version
+- **SECURITY.md** -- added 0.4.x to supported versions table
+- **Dead code cleanup** -- removed unused `Get-ProcessParentId`, `Get-ProcessCommandLine` from Helpers.ps1, unused `$maxPenalty` from ReportGenerator.ps1, unused `$Color` parameter from CI summary writer
+- **Redundant guard in Check-Processes.ps1** -- removed unreachable `System32 + whitelist` check (already handled by earlier whitelist guard)
+- **`Get-DefaultConfig` missing fields** -- added `TrustedAppDirs` and `Suppressions` defaults so configless runs don't silently skip filtering
+
+### Changed
+- **`fix-bom.ps1` now tracked** -- removed from `.gitignore` and updated to use `$PSScriptRoot` instead of hardcoded path; new clones now include the BOM-fix utility referenced by the pre-commit hook and CONTRIBUTING.md
+
 ## [0.4.4] - 2026-03-15
 
 ### Added

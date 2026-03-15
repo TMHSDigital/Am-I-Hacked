@@ -28,7 +28,6 @@ function Invoke-ProcessesChecks {
 
         if ($whitelist -contains $procName) { continue }
         if (-not $procPath) { continue }
-        if ($procPath -match "^C:\\Windows\\System32" -and $whitelist -contains $procName) { continue }
         if ($procPath -match '^C:\\Program Files\\WindowsApps\\') { continue }
         if ($script:Config.TrustedAppDirs) {
             $inTrustedDir = $false

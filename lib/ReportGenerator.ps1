@@ -17,7 +17,6 @@ function Generate-HtmlReport {
     $infoCount = ($Findings | Where-Object { $_.Severity -eq "INFO" }).Count
     $totalCount = $Findings.Count
 
-    $maxPenalty = [math]::Max(1, $totalCount)
     $penalty = ($critCount * 25) + ($warnCount * 5) + ($infoCount * 0.5)
     $score = [math]::Max(0, [math]::Min(100, [math]::Round(100 - $penalty)))
     $scoreColor = if ($score -ge 80) { "#22c55e" } elseif ($score -ge 50) { "#f59e0b" } else { "#ef4444" }

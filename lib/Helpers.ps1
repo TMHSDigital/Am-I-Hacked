@@ -284,11 +284,15 @@ function Get-DefaultConfig {
             "Apple Inc.", "Adobe Inc.", "Valve Corporation"
         )
 
+        TrustedAppDirs = @()
+
         TrustedDomainSuffixes = @(
             ".microsoft.com", ".windowsupdate.com", ".akamaized.net",
             ".cloudfront.net", ".slack-msgs.com", ".googleapis.com",
             ".gstatic.com", ".steamcontent.com"
         )
+
+        Suppressions = @()
     }
 }
 
@@ -306,26 +310,6 @@ function New-DefaultConfig {
 }
 
 # ── Utility Functions ────────────────────────────────────────────────────────
-
-function Get-ProcessParentId {
-    param([int]$ProcessId)
-    try {
-        $proc = Get-CimInstance Win32_Process -Filter "ProcessId = $ProcessId" -ErrorAction SilentlyContinue
-        return $proc.ParentProcessId
-    } catch {
-        return $null
-    }
-}
-
-function Get-ProcessCommandLine {
-    param([int]$ProcessId)
-    try {
-        $proc = Get-CimInstance Win32_Process -Filter "ProcessId = $ProcessId" -ErrorAction SilentlyContinue
-        return $proc.CommandLine
-    } catch {
-        return ""
-    }
-}
 
 function Test-IsTrustedIP {
     param([string]$IP)

@@ -80,7 +80,7 @@ if ($script:NonInteractive) {
 $script:RedactMap = @{}
 $script:SuppressedCount = 0
 
-$script:Version = "0.4.4"
+$script:Version = "0.4.5"
 
 # ── Helpers (loaded first) ───────────────────────────────────────────────────
 
@@ -341,22 +341,20 @@ if ($script:NonInteractive) {
     Write-Host "  |$verdictPad|"
     Write-Host "  +$hbar+"
 
-    function Write-SummaryLine { param($Label, $Value, $Color, $Width)
-        $content = "  $Label$Value"
-        $innerWidth = $Width - 2
+    function Write-SummaryLine { param($Label, $Value, $Width)
         $line = "  | $Label$Value".PadRight($Width + 3) + " |"
         Write-Host $line
     }
 
-    Write-SummaryLine "CRITICAL  " "$critCount" "Red" $w
-    Write-SummaryLine "WARNING   " "$warnCount" "Yellow" $w
-    Write-SummaryLine "INFO      " "$infoCount" "DarkCyan" $w
-    Write-SummaryLine "Suppressed " "$($script:SuppressedCount)" "DarkGray" $w
+    Write-SummaryLine "CRITICAL  " "$critCount" $w
+    Write-SummaryLine "WARNING   " "$warnCount" $w
+    Write-SummaryLine "INFO      " "$infoCount" $w
+    Write-SummaryLine "Suppressed " "$($script:SuppressedCount)" $w
     Write-Host "  |  $(' ' * ($w - 2))  |"
-    Write-SummaryLine "Total     " "$totalCount findings" "White" $w
-    Write-SummaryLine "Duration  " "$durationStr" "DarkGray" $w
+    Write-SummaryLine "Total     " "$totalCount findings" $w
+    Write-SummaryLine "Duration  " "$durationStr" $w
     Write-Host "  |  $(' ' * ($w - 2))  |"
-    Write-SummaryLine "Report    " "See path below" "DarkGray" $w
+    Write-SummaryLine "Report    " "See path below" $w
     Write-Host "  +$hbar+"
 } else {
     Write-Host "  ╔$('═' * $w)╗" -ForegroundColor DarkCyan
