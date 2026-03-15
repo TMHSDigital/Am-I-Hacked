@@ -5,18 +5,21 @@
 **Zero-dependency Windows security assessment tool.**<br>
 **Finds compromise indicators. Generates an interactive HTML report. Maps everything to MITRE ATT&CK.**
 
+`CRITICAL` -- strong IOC, act now &nbsp;|&nbsp; `WARNING` -- suspicious, investigate &nbsp;|&nbsp; `INFO` -- worth noting
+
 <br>
 
-[![PowerShell 5.1+](https://img.shields.io/badge/PowerShell-5.1%2B-5391FE?style=for-the-badge&logo=powershell&logoColor=white)](https://docs.microsoft.com/powershell/)
-[![Windows 10/11](https://img.shields.io/badge/Windows-10%20%2F%2011-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://www.microsoft.com/windows)
-[![License: MIT](https://img.shields.io/badge/License-MIT-22c55e?style=for-the-badge)](LICENSE)
+[![PowerShell 5.1+](https://img.shields.io/badge/PowerShell-5.1%2B-0d1117?style=for-the-badge&logo=powershell&logoColor=5391FE)](https://docs.microsoft.com/powershell/)
+[![Windows 10/11](https://img.shields.io/badge/Windows-10%20%2F%2011-0d1117?style=for-the-badge&logo=windows&logoColor=white)](https://www.microsoft.com/windows)
+[![License: MIT](https://img.shields.io/badge/License-MIT-0d1117?style=for-the-badge&logoColor=white)](LICENSE)
 [![Version](https://img.shields.io/badge/Version-0.3.4-FF6B6B?style=for-the-badge)](#changelog)
 
-[![Zero Dependencies](https://img.shields.io/badge/Dependencies-Zero-brightgreen?style=flat-square)](#)
-[![MITRE ATT&CK](https://img.shields.io/badge/MITRE%20ATT%26CK-40%2B%20Techniques-red?style=flat-square&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHRleHQgeD0iMCIgeT0iMTIiIGZvbnQtc2l6ZT0iMTIiPuKalO+4jzwvdGV4dD48L3N2Zz4=)](#mitre-attck-coverage)
-[![Detections](https://img.shields.io/badge/Detections-70%2B-blue?style=flat-square)](#modules)
-[![VirusTotal](https://img.shields.io/badge/VirusTotal-Integrated-394EFF?style=flat-square&logo=virustotal&logoColor=white)](#configuration)
-[![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-brightgreen?style=flat-square)](CONTRIBUTING.md)
+[![Zero Dependencies](https://img.shields.io/badge/Dependencies-Zero-0d1117?style=flat-square&labelColor=0d1117)](#)
+[![MITRE ATT&CK](https://img.shields.io/badge/MITRE%20ATT%26CK-40%2B%20Techniques-ff3333?style=flat-square&labelColor=0d1117)](#mitre-attck-coverage)
+[![Detections](https://img.shields.io/badge/Detections-70%2B-ff3333?style=flat-square&labelColor=0d1117)](#modules)
+[![VirusTotal](https://img.shields.io/badge/VirusTotal-Integrated-394EFF?style=flat-square&labelColor=0d1117&logo=virustotal&logoColor=white)](#configuration)
+[![Scan Time](https://img.shields.io/badge/Scan%20Time-~30s-0d1117?style=flat-square&labelColor=0d1117)](#quick-start)
+[![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-22c55e?style=flat-square&labelColor=0d1117)](CONTRIBUTING.md)
 
 </div>
 
@@ -27,6 +30,25 @@
 Most security tools are either enterprise-grade ($$$ + agents + cloud) or script-kiddie one-liners that check 3 things. **Am I Hacked?** fills the gap: a single PowerShell script that runs 70+ heuristic checks across 5 security domains, produces an actionable HTML report, and requires zero installation, zero dependencies, zero internet.
 
 **Run it. Read the report. Know where you stand.**
+
+### How It Works
+
+```mermaid
+flowchart LR
+    Launch["AmIHacked.ps1"] --> Discover["Auto-discover modules"]
+    Discover --> Processes["Processes"]
+    Discover --> Network["Network"]
+    Discover --> Accounts["Accounts"]
+    Discover --> FileSystem["File System"]
+    Discover --> Defense["Defense Evasion"]
+    Processes --> Findings["Findings + MITRE tags"]
+    Network --> Findings
+    Accounts --> Findings
+    FileSystem --> Findings
+    Defense --> Findings
+    Findings --> Report["HTML Report"]
+    Findings --> JSON["JSON Export"]
+```
 
 ---
 
@@ -141,6 +163,8 @@ The self-contained HTML report (single file, no external dependencies) includes:
 | **Dual Theme** | Professional default + "Terminal Mode" (CRT scanlines, glitch effects, neon glow) |
 | **Auto-Collapse** | INFO-only categories start collapsed to surface what matters |
 | **Print Support** | Clean print-optimized layout |
+
+> Screenshots coming soon. Run the tool to see the report in action.
 
 ---
 
