@@ -66,7 +66,9 @@ function Invoke-DefenseEvasionChecks {
     $amsiDll = "$env:SystemRoot\System32\amsi.dll"
     if (Test-Path $amsiDll) {
         $sig = Get-FileSignature -FilePath $amsiDll
-        if (-not $sig -or $sig.Status -ne "Valid") {
+        if ($sig -and $sig.Status -eq "CheckFailed") {
+            Write-Status "AMSI signature check unavailable (PS.Security module could not be loaded)." -Color DarkGray
+        } elseif (-not $sig -or $sig.Status -ne "Valid") {
             Add-Finding -Severity "CRITICAL" -Category "DefenseEvasion" `
                 -Title "AMSI DLL Signature Invalid" `
                 -Description "amsi.dll at '$amsiDll' does not have a valid digital signature (Status: $(if ($sig) { $sig.Status } else { 'Missing' })). This may indicate the AMSI interface has been tampered with to bypass script scanning." `

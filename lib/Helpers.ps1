@@ -378,12 +378,14 @@ function Test-IsPrivateIP {
 
 function Get-FileSignature {
     param([string]$FilePath)
+    # Force-load the module; suppress TypeData-conflict errors that occur in some PS 5.1 sessions
+    Import-Module Microsoft.PowerShell.Security -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue 2>$null
     try {
         $sig = Get-AuthenticodeSignature $FilePath -ErrorAction SilentlyContinue
-        return $sig
-    } catch {
-        return $null
-    }
+        if ($sig) { return $sig }
+    } catch { }
+    # If the module still couldn't load, return a sentinel so callers don't treat it as "unsigned"
+    return [PSCustomObject]@{ Status = "CheckFailed"; StatusMessage = "Signature check unavailable (PS.Security module could not be loaded)." }
 }
 
 function Get-FileVersionInfo {
