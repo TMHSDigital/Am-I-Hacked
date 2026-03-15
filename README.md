@@ -1,13 +1,13 @@
 <div align="center">
 
-```
+<pre>
      █████╗ ███╗   ███╗    ██╗    ██╗  ██╗ █████╗  ██████╗██╗  ██╗███████╗██████╗ ██████╗
     ██╔══██╗████╗ ████║    ██║    ██║  ██║██╔══██╗██╔════╝██║ ██╔╝██╔════╝██╔══██╗╚════██╗
     ███████║██╔████╔██║    ██║    ███████║███████║██║     █████╔╝ █████╗  ██║  ██║  █████╔╝
     ██╔══██║██║╚██╔╝██║    ██║    ██╔══██║██╔══██║██║     ██╔═██╗ ██╔══╝  ██║  ██║ ╚═══██╗
     ██║  ██║██║ ╚═╝ ██║    ██║    ██║  ██║██║  ██║╚██████╗██║  ██╗███████╗██████╔╝██████╔╝
     ╚═╝  ╚═╝╚═╝     ╚═╝    ╚═╝    ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚══════╝╚═════╝ ╚═════╝
-```
+</pre>
 
 **Zero-dependency Windows security assessment tool.**<br>
 **Finds compromise indicators. Generates an interactive HTML report. Maps everything to MITRE ATT&CK.**
@@ -43,11 +43,11 @@ Most security tools are either enterprise-grade ($$$ + agents + cloud) or script
 git clone https://github.com/TMHSDigital/Am-I-Hacked.git
 cd Am-I-Hacked
 
-# Run a full scan (right-click PowerShell → Run as Administrator for best results)
+# Run as Administrator for full results
 .\AmIHacked.ps1
 ```
 
-The report opens automatically in your browser. That's it.
+The report opens automatically in your browser. Findings are severity-colored (CRITICAL / WARNING / INFO), tagged with MITRE ATT&CK technique IDs, and include copy-paste remediation commands.
 
 <details>
 <summary><strong>First time? Create a baseline first.</strong></summary>
@@ -65,6 +65,38 @@ Baselines enable **change detection** — the most powerful signal for catching 
 > Baselines are only exported when you pass `-CreateBaseline`. A compromised scan cannot overwrite your clean baseline.
 
 </details>
+
+---
+
+## Usage
+
+```powershell
+# Offline mode — no API calls (VirusTotal, AbuseIPDB)
+.\AmIHacked.ps1 -Offline
+
+# Export JSON alongside HTML
+.\AmIHacked.ps1 -ExportJson
+
+# Skip specific modules
+.\AmIHacked.ps1 -SkipModules Network,Accounts
+
+# Compare against a specific baseline
+.\AmIHacked.ps1 -BaselinePath C:\Backups\clean_baseline.json
+
+# Custom output directory
+.\AmIHacked.ps1 -OutputPath "C:\SecurityReports"
+```
+
+| Parameter | Description |
+|-----------|-------------|
+| `-OutputPath` | Report output directory (default: `.\reports`) |
+| `-SkipModules` | Module names to skip (e.g. `Network,Accounts`) |
+| `-ConfigPath` | Path to `config.json` (default: `.\config\config.json`) |
+| `-Offline` | Disable all external API calls |
+| `-BaselinePath` | Path to a specific baseline JSON |
+| `-CreateBaseline` | Snapshot current system state |
+| `-ExportJson` | Emit findings as JSON alongside HTML |
+| `-VerboseOutput` | Enable verbose console output |
 
 ---
 
@@ -97,82 +129,6 @@ Baselines enable **change detection** — the most powerful signal for catching 
 
 ---
 
-## Usage
-
-```powershell
-# Full scan with all modules
-.\AmIHacked.ps1
-
-# Offline mode — no API calls (VirusTotal, AbuseIPDB)
-.\AmIHacked.ps1 -Offline
-
-# Export JSON alongside HTML
-.\AmIHacked.ps1 -ExportJson
-
-# Skip specific modules
-.\AmIHacked.ps1 -SkipModules Network,Accounts
-
-# Compare against a specific baseline
-.\AmIHacked.ps1 -BaselinePath C:\Backups\clean_baseline.json
-
-# Custom output directory
-.\AmIHacked.ps1 -OutputPath "C:\SecurityReports"
-
-# The kitchen sink
-.\AmIHacked.ps1 -Offline -ExportJson -CreateBaseline
-```
-
-| Parameter | Description |
-|-----------|-------------|
-| `-OutputPath` | Report output directory (default: `.\reports`) |
-| `-SkipModules` | Comma-separated module names to skip |
-| `-ConfigPath` | Path to `config.json` |
-| `-Offline` | Disable all external API calls |
-| `-BaselinePath` | Path to a specific baseline JSON |
-| `-CreateBaseline` | Snapshot current system state |
-| `-ExportJson` | Emit findings as JSON alongside HTML |
-| `-VerboseOutput` | Enable verbose console output |
-
----
-
-## Console Output
-
-The TUI provides real-time scan feedback with progress tracking, severity-colored tallies, and per-module timing:
-
-```
-     █████╗ ███╗   ███╗    ██╗    ...
-    ██╔══██╗████╗ ████║    ██║    ...
-
-    Windows Security Assessment Tool  v0.3.3  [ADMIN]
-    2026-03-05 21:34:05
-
-  [*] Config loaded (41 trusted companies, no API keys)
-  [*] Scanning 5 modules: Processes, Network, Accounts, FileSystem, DefenseEvasion
-
-  ┌──────────────────────────────────────────────────────┐
-  │ Process & Service Analysis                           │
-  │  [████░░░░░░░░░░░░░░░░] 17% | 1W                   │
-  └──────────────────────────────────────────────────────┘
-  [*] Checking signatures... (328 processes)
-  [!!!] CRITICAL │ Unsigned/Invalid Process: htb-mcp-server.exe
-  [ ! ] WARNING  │ Unquoted Service Path: UpcElevationService
-  [ i ] INFO     │ SYSTEM Service Outside Standard Dirs: VBoxSDS
-  [+] Done 5.4s
-
-  ╔════════════════════════════════════════════╗
-  ║              THREATS DETECTED              ║
-  ╠════════════════════════════════════════════╣
-  ║  CRITICAL  1                               ║
-  ║  WARNING   12                              ║
-  ║  INFO      21                              ║
-  ║                                            ║
-  ║  Total     34 findings                     ║
-  ║  Duration  34.9s                           ║
-  ╚════════════════════════════════════════════╝
-```
-
----
-
 ## Report
 
 The self-contained HTML report (single file, no external dependencies) includes:
@@ -199,7 +155,7 @@ Copy the example config and edit it for your environment:
 Copy-Item config/config.example.json config/config.json
 ```
 
-Then edit `config/config.json` (this file is gitignored so your API keys stay local):
+Then edit `config/config.json` (gitignored — API keys stay local):
 
 ```jsonc
 {
@@ -216,7 +172,7 @@ Then edit `config/config.json` (this file is gitignored so your API keys stay lo
 }
 ```
 
-> **Note:** If no `config/config.json` exists, the tool runs with sensible built-in defaults.
+> If no `config/config.json` exists, the tool runs with sensible built-in defaults.
 
 <details>
 <summary><strong>All configuration options</strong></summary>
@@ -268,7 +224,40 @@ Every finding is tagged with technique IDs from the [MITRE ATT&CK](https://attac
 
 ---
 
-## Project Structure
+## Requirements
+
+| Requirement | Details |
+|-------------|---------|
+| **OS** | Windows 10 / 11 |
+| **PowerShell** | 5.1+ (ships with Windows) |
+| **Privileges** | Administrator recommended (required for event logs, Defender, service analysis) |
+| **Dependencies** | None. Zero. Nada. |
+| **Internet** | Optional — only for VirusTotal/AbuseIPDB API calls |
+
+---
+
+## Contributing
+
+Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
+
+The module system is fully dynamic — add a `Check-YourModule.ps1` to `modules/` with an `Invoke-YourModuleChecks` function and it's auto-discovered.
+
+<details>
+<summary><strong>Ideas for new modules & detections</strong></summary>
+
+- Browser extension analysis
+- Certificate store anomalies (rogue root CAs)
+- PowerShell profile injection detection
+- DNS-over-HTTPS covert channel detection
+- SSH key enumeration and audit
+- Clipboard monitoring detection
+- Named pipe analysis
+- DLL search order hijacking (beyond COM)
+
+</details>
+
+<details>
+<summary><strong>Project structure</strong></summary>
 
 ```
 Am-I-Hacked/
@@ -286,43 +275,8 @@ Am-I-Hacked/
 │   └── ReportGenerator.ps1       # Self-contained HTML report generator
 ├── tests/
 │   └── Invoke-MockScan.ps1       # Test harness with mock IOCs
-├── reports/                      # Generated reports (gitignored)
-├── CHANGELOG.md
-├── CONTRIBUTING.md
-└── README.md
+└── reports/                      # Generated reports (gitignored)
 ```
-
----
-
-## Requirements
-
-| Requirement | Details |
-|-------------|---------|
-| **OS** | Windows 10 / 11 |
-| **PowerShell** | 5.1+ (ships with Windows) |
-| **Privileges** | Administrator recommended (required for event logs, Defender, service analysis) |
-| **Dependencies** | None. Zero. Nada. |
-| **Internet** | Optional — only for VirusTotal/AbuseIPDB API calls |
-
----
-
-## Contributing
-
-Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
-
-The module system is fully dynamic — add a `Check-YourModule.ps1` to `modules/` with a `Invoke-YourModuleChecks` function and it's auto-discovered.
-
-<details>
-<summary><strong>Ideas for new modules & detections</strong></summary>
-
-- Browser extension analysis
-- Certificate store anomalies (rogue root CAs)
-- PowerShell profile injection detection
-- DNS-over-HTTPS covert channel detection
-- SSH key enumeration and audit
-- Clipboard monitoring detection
-- Named pipe analysis
-- DLL search order hijacking (beyond COM)
 
 </details>
 
