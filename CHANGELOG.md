@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.3] - 2026-03-15 -- Public Release
+
+### Added
+- `SECURITY.md` with vulnerability disclosure policy and scope
+- `CLAUDE.md` for project documentation and AI-assisted development context
+
+### Changed
+- **Open-source release** -- fresh public repository with clean commit history and noreply author email
+- **Config safety** -- renamed `config/config.json` to `config/config.example.json`; user config is now gitignored to prevent accidental API key commits
+- **Console banner** -- replaced Unicode block-character ASCII art with standard-character ASCII banner for reliable terminal rendering
+- **HTML report polish** -- removed all emoji, refined typography (Inter + JetBrains Mono), improved verdict banner with CSS-only icons, tightened spacing, more professional default appearance
+- **README overhaul** -- reorganized sections, collapsed verbose blocks (Console Output, Project Structure) into details elements, replaced broken SVG banner with clean heading
+- Removed personal utility scripts (`_run_scan.ps1`, `_fix_bom.ps1`)
+- Added 10 GitHub repository topics for discoverability
+
 ## [0.3.0] - 2026-03-05
 
 ### Added

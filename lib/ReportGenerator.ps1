@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Generates a polished HTML report from scan findings.
 #>
@@ -24,23 +24,23 @@ function Generate-HtmlReport {
 
     $verdict = "CLEAN"
     $verdictColor = "#22c55e"
-    $verdictIcon = "&#x2714;"
+    $verdictIcon = "check"
     $verdictMessage = "No critical issues detected. Your system appears clean."
 
     if ($critCount -gt 0) {
         $verdict = "COMPROMISED"
         $verdictColor = "#ef4444"
-        $verdictIcon = "&#x2718;"
+        $verdictIcon = "critical"
         $verdictMessage = "Critical indicators of compromise detected. Immediate action required."
     } elseif ($warnCount -gt 3) {
         $verdict = "SUSPICIOUS"
         $verdictColor = "#f59e0b"
-        $verdictIcon = "&#x26A0;"
+        $verdictIcon = "warning"
         $verdictMessage = "Multiple warnings detected. Investigation recommended."
     } elseif ($warnCount -gt 0) {
         $verdict = "CAUTION"
         $verdictColor = "#eab308"
-        $verdictIcon = "&#x26A0;"
+        $verdictIcon = "warning"
         $verdictMessage = "Some warnings found. Review the findings below."
     }
 
@@ -62,16 +62,6 @@ function Generate-HtmlReport {
         $catWarn = ($cat.Group | Where-Object { $_.Severity -eq "WARNING" }).Count
         $catInfo = ($cat.Group | Where-Object { $_.Severity -eq "INFO" }).Count
 
-        $catIcon = switch ($cat.Name) {
-            "Process"         { "&#x2699;" }
-            "Network"         { "&#x1F310;" }
-            "Account"         { "&#x1F464;" }
-            "FileSystem"      { "&#x1F4C1;" }
-            "DefenseEvasion"  { "&#x1F6E1;" }
-            "Baseline"        { "&#x1F4CA;" }
-            default           { "&#x1F50D;" }
-        }
-
         $catDisplayName = switch ($cat.Name) {
             "Process"         { "Process &amp; Service Analysis" }
             "Network"         { "Network Indicators" }
@@ -86,7 +76,6 @@ function Generate-HtmlReport {
         <div class="category-section">
             <div class="category-header" onclick="toggleCategory(this)">
                 <div class="category-title">
-                    <span class="category-icon">$catIcon</span>
                     <h2>$catDisplayName</h2>
                     <div class="category-badges">
                         $(if ($catCrit -gt 0) { "<span class='badge badge-critical'>$catCrit CRITICAL</span>" })
@@ -105,11 +94,6 @@ function Generate-HtmlReport {
 
         foreach ($finding in $sortedFindings) {
             $sevClass = $finding.Severity.ToLower()
-            $sevIcon = switch ($finding.Severity) {
-                "CRITICAL" { "&#x1F534;" }
-                "WARNING"  { "&#x1F7E1;" }
-                "INFO"     { "&#x1F535;" }
-            }
 
             $mitreHtml = ""
             if ($finding.MITRE -and $finding.MITRE.Count -gt 0) {
@@ -135,7 +119,7 @@ function Generate-HtmlReport {
             if ($finding.Remediation) {
                 $escapedRemediation = $finding.Remediation -replace '<','&lt;' -replace '>','&gt;'
                 $remediationWithCopy = $escapedRemediation -replace '((?:Remove-|Set-|Disable-|Enable-|Get-|Stop-|Start-|Update-|New-|Add-|Unregister-)[A-Za-z\-]+(?:\s+[^\r\n]*?)?)(?=\s*$|\.)', '<code class="ps-cmd" onclick="copyCmd(this)">$1</code>'
-                $remediationHtml = "<div class='finding-remediation'><strong>&#x1F6E0; Remediation:</strong> $remediationWithCopy</div>"
+                $remediationHtml = "<div class='finding-remediation'><span class='remediation-label'>Remediation:</span> $remediationWithCopy</div>"
             }
 
             $escapedDescription = $finding.Description -replace '<','&lt;' -replace '>','&gt;'
@@ -143,7 +127,8 @@ function Generate-HtmlReport {
             $findingsHtml += @"
                 <div class="finding finding-$sevClass" data-severity="$sevClass">
                     <div class="finding-header">
-                        <span class="finding-severity">$sevIcon $($finding.Severity)</span>
+                        <span class="sev-indicator sev-$sevClass"></span>
+                        <span class="finding-severity">$($finding.Severity)</span>
                         <span class="finding-title">$($finding.Title)</span>
                         $mitreHtml
                     </div>
@@ -168,36 +153,32 @@ function Generate-HtmlReport {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Am I Hacked? — Security Report</title>
+    <title>Am I Hacked? -- Security Report</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap');
-        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700;800;900&display=swap');
 
         :root {
-            --bg-primary: #0f1117;
-            --bg-secondary: #161822;
-            --bg-card: #1c1f2e;
-            --bg-card-hover: #252838;
-            --border: #2a2d3e;
-            --text-primary: #e4e4e7;
-            --text-secondary: #a1a1aa;
-            --text-muted: #71717a;
-            --critical: #ef4444;
-            --critical-bg: rgba(239,68,68,0.06);
-            --critical-border: rgba(239,68,68,0.18);
-            --warning: #f59e0b;
-            --warning-bg: rgba(245,158,11,0.06);
-            --warning-border: rgba(245,158,11,0.18);
-            --info: #3b82f6;
-            --info-bg: rgba(59,130,246,0.06);
-            --info-border: rgba(59,130,246,0.18);
+            --bg-primary: #0d0f14;
+            --bg-secondary: #141720;
+            --bg-card: #1a1d2a;
+            --bg-card-hover: #21253a;
+            --border: #262a3d;
+            --border-subtle: #1e2235;
+            --text-primary: #e8e8ec;
+            --text-secondary: #a0a0b0;
+            --text-muted: #6b6b80;
+            --critical: #f04444;
+            --critical-bg: rgba(240,68,68,0.05);
+            --critical-border: rgba(240,68,68,0.15);
+            --warning: #eba020;
+            --warning-bg: rgba(235,160,32,0.05);
+            --warning-border: rgba(235,160,32,0.15);
+            --info: #4488ee;
+            --info-bg: rgba(68,136,238,0.05);
+            --info-border: rgba(68,136,238,0.15);
             --green: #22c55e;
-            --accent: #8b5cf6;
-
-            /* Terminal Mode overrides */
-            --neon-red: #ff1744;
-            --neon-amber: #ffd600;
-            --neon-blue: #00b0ff;
+            --accent: #7c6cf0;
+            --accent-border: rgba(124,108,240,0.25);
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -206,121 +187,107 @@ function Generate-HtmlReport {
             font-family: 'Inter', -apple-system, sans-serif;
             background: var(--bg-primary);
             color: var(--text-primary);
-            line-height: 1.6;
+            line-height: 1.65;
             min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
         }
 
-        /* ── Terminal Mode ── */
+        /* -- Terminal Mode -- */
         body.terminal-mode {
             background-image:
-                radial-gradient(ellipse at 20% 50%, rgba(139,92,246,0.04) 0%, transparent 50%),
-                radial-gradient(ellipse at 80% 20%, rgba(255,26,68,0.03) 0%, transparent 50%),
-                radial-gradient(ellipse at 50% 80%, rgba(0,176,255,0.03) 0%, transparent 50%);
+                radial-gradient(ellipse at 20% 50%, rgba(124,108,240,0.04) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 20%, rgba(240,68,68,0.03) 0%, transparent 50%);
         }
 
         body.terminal-mode::after {
             content: '';
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
-            background:
-                repeating-linear-gradient(0deg, rgba(0,0,0,0.06) 0px, rgba(0,0,0,0.06) 1px, transparent 1px, transparent 3px),
-                radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.4) 100%);
+            background: repeating-linear-gradient(
+                0deg, rgba(0,0,0,0.05) 0px, rgba(0,0,0,0.05) 1px, transparent 1px, transparent 3px
+            );
             pointer-events: none;
             z-index: 9999;
         }
 
         body.terminal-mode .report-header h1 {
-            background: linear-gradient(135deg, var(--neon-red) 0%, #b388ff 40%, var(--neon-blue) 100%);
+            background: linear-gradient(135deg, var(--critical) 0%, #b388ff 50%, var(--info) 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            animation: glitch-skew 4s infinite linear alternate-reverse;
         }
 
-        body.terminal-mode .verdict-banner {
-            animation: verdict-pulse 3s ease-in-out infinite;
-        }
-
-        body.terminal-mode .finding-critical { border-left-color: var(--neon-red); }
-        body.terminal-mode .finding-critical:hover { box-shadow: -4px 0 12px rgba(255,23,68,0.15); }
-        body.terminal-mode .finding-warning { border-left-color: var(--neon-amber); }
-        body.terminal-mode .finding-warning:hover { box-shadow: -4px 0 12px rgba(255,214,0,0.1); }
-        body.terminal-mode .finding-info { border-left-color: var(--neon-blue); }
-
-        body.terminal-mode .category-section:hover { border-color: rgba(179,136,255,0.3); }
-        body.terminal-mode .stat-card:hover { box-shadow: 0 0 15px rgba(179,136,255,0.15); }
-
-        @keyframes glitch-skew {
-            0%, 95% { transform: none; }
-            96% { transform: skewX(-2deg) translateX(-2px); }
-            97% { transform: skewX(1deg) translateX(1px); }
-            98% { transform: skewX(-1deg); }
-            100% { transform: none; }
-        }
+        body.terminal-mode .verdict-banner { animation: verdict-pulse 4s ease-in-out infinite; }
+        body.terminal-mode .finding-critical { border-left-color: #ff2244; }
+        body.terminal-mode .finding-critical:hover { box-shadow: -4px 0 16px rgba(255,34,68,0.12); }
+        body.terminal-mode .category-section:hover { border-color: rgba(124,108,240,0.3); }
 
         @keyframes verdict-pulse {
-            0%, 100% { box-shadow: 0 0 20px ${verdictColor}15, 0 0 60px ${verdictColor}08; }
-            50% { box-shadow: 0 0 30px ${verdictColor}25, 0 0 80px ${verdictColor}12; }
+            0%, 100% { box-shadow: 0 0 20px ${verdictColor}10, 0 0 60px ${verdictColor}05; }
+            50% { box-shadow: 0 0 30px ${verdictColor}18, 0 0 80px ${verdictColor}08; }
         }
 
         .container {
-            max-width: 1100px;
+            max-width: 1060px;
             margin: 0 auto;
-            padding: 2rem;
+            padding: 2.5rem 2rem;
         }
 
-        /* Header */
+        /* -- Header -- */
         .report-header {
             text-align: center;
-            padding: 3rem 0;
+            padding: 3rem 0 2.5rem;
             border-bottom: 1px solid var(--border);
-            margin-bottom: 2rem;
+            margin-bottom: 2.5rem;
         }
 
         .report-header h1 {
-            font-family: 'Share Tech Mono', 'JetBrains Mono', monospace;
-            font-size: 2.8rem;
-            font-weight: 700;
-            letter-spacing: 0.08em;
+            font-family: 'Inter', sans-serif;
+            font-size: 2.4rem;
+            font-weight: 900;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
             margin-bottom: 0.5rem;
             color: var(--text-primary);
         }
 
         .report-header .subtitle {
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             color: var(--text-muted);
             font-family: 'JetBrains Mono', monospace;
+            letter-spacing: 0.02em;
         }
 
         .header-actions {
             display: flex;
             justify-content: center;
             gap: 0.5rem;
-            margin-top: 1rem;
+            margin-top: 1.25rem;
         }
 
         .header-btn {
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.7rem;
-            padding: 0.35rem 0.75rem;
+            padding: 0.4rem 0.85rem;
             border-radius: 4px;
             border: 1px solid var(--border);
             background: var(--bg-card);
             color: var(--text-muted);
             cursor: pointer;
             transition: all 0.2s;
+            letter-spacing: 0.02em;
         }
         .header-btn:hover { background: var(--bg-card-hover); color: var(--text-primary); }
         .header-btn.active { border-color: var(--accent); color: var(--accent); }
 
-        /* Verdict Banner */
+        /* -- Verdict Banner -- */
         .verdict-banner {
             background: var(--bg-secondary);
-            border: 2px solid ${verdictColor};
-            border-radius: 12px;
-            padding: 2rem;
+            border: 1px solid ${verdictColor}40;
+            border-radius: 10px;
+            padding: 2.5rem 2rem;
             text-align: center;
-            margin-bottom: 2rem;
+            margin-bottom: 2.5rem;
             position: relative;
             overflow: hidden;
         }
@@ -329,73 +296,90 @@ function Generate-HtmlReport {
             content: '';
             position: absolute;
             top: -50%; left: -50%; width: 200%; height: 200%;
-            background: radial-gradient(circle, ${verdictColor}08 0%, transparent 70%);
+            background: radial-gradient(circle, ${verdictColor}06 0%, transparent 70%);
             pointer-events: none;
         }
 
-        .verdict-icon { font-size: 3rem; margin-bottom: 0.5rem; }
+        .verdict-icon {
+            width: 48px; height: 48px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: white;
+        }
+
+        .verdict-icon.icon-check { background: var(--green); }
+        .verdict-icon.icon-warning { background: var(--warning); }
+        .verdict-icon.icon-critical { background: var(--critical); }
 
         .verdict-label {
-            font-family: 'Share Tech Mono', monospace;
-            font-size: 2rem;
-            font-weight: 700;
+            font-family: 'Inter', sans-serif;
+            font-size: 1.6rem;
+            font-weight: 800;
             color: ${verdictColor};
             margin-bottom: 0.5rem;
             letter-spacing: 0.15em;
+            text-transform: uppercase;
         }
 
-        .verdict-message { color: var(--text-secondary); font-size: 1rem; }
+        .verdict-message { color: var(--text-secondary); font-size: 0.9rem; }
 
-        /* Stats Grid */
+        /* -- Score Ring -- */
+        .score-section {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 2.5rem;
+        }
+        .score-ring-wrap { text-align: center; }
+        .score-ring-container { position: relative; width: 110px; height: 110px; }
+        .score-ring { transform: rotate(-90deg); }
+        .score-ring-bg { fill: none; stroke: var(--border); stroke-width: 7; }
+        .score-ring-fill { fill: none; stroke-width: 7; stroke-linecap: round; transition: stroke-dashoffset 1.5s ease-out; }
+        .score-value {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-family: 'JetBrains Mono', monospace; font-size: 1.75rem; font-weight: 700;
+        }
+        .score-label {
+            font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;
+            letter-spacing: 0.1em; margin-top: 0.5rem;
+        }
+
+        /* -- Stats Grid -- */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 1rem;
-            margin-bottom: 2rem;
+            margin-bottom: 2.5rem;
         }
 
         .stat-card {
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 8px;
-            padding: 1.25rem;
+            padding: 1.5rem 1rem;
             text-align: center;
-            transition: border-color 0.3s, box-shadow 0.3s;
+            transition: border-color 0.3s;
         }
-        .stat-card:hover { border-color: var(--accent); box-shadow: 0 0 12px rgba(139,92,246,0.1); }
-
-        /* Score Ring */
-        .score-section {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 2rem;
-            margin-bottom: 2rem;
-        }
-        .score-ring-container { position: relative; width: 120px; height: 120px; }
-        .score-ring { transform: rotate(-90deg); }
-        .score-ring-bg { fill: none; stroke: var(--border); stroke-width: 8; }
-        .score-ring-fill { fill: none; stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset 1.5s ease-out; }
-        .score-value {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            font-family: 'Share Tech Mono', monospace; font-size: 2rem; font-weight: 700;
-        }
-        .score-label {
-            font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;
-            letter-spacing: 0.1em; text-align: center; margin-top: 0.25rem;
-        }
+        .stat-card:hover { border-color: var(--accent); }
 
         .stat-value {
-            font-family: 'Share Tech Mono', monospace;
+            font-family: 'JetBrains Mono', monospace;
             font-size: 2rem;
             font-weight: 700;
+            line-height: 1;
+            margin-bottom: 0.35rem;
         }
 
         .stat-label {
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             color: var(--text-muted);
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.06em;
+            font-weight: 500;
         }
 
         .stat-critical .stat-value { color: var(--critical); }
@@ -403,24 +387,47 @@ function Generate-HtmlReport {
         .stat-info .stat-value { color: var(--info); }
         .stat-total .stat-value { color: var(--text-primary); }
 
-        /* System Info */
+        /* -- System Info -- */
         .system-info {
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 8px;
-            padding: 1.25rem;
-            margin-bottom: 2rem;
+            padding: 1.25rem 1.5rem;
+            margin-bottom: 2.5rem;
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 0.75rem;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
             font-size: 0.85rem;
         }
 
-        .system-info div { display: flex; flex-direction: column; }
-        .system-info .label { color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; }
-        .system-info .value { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: var(--text-primary); }
+        .system-info div { display: flex; flex-direction: column; gap: 0.15rem; }
+        .system-info .label { color: var(--text-muted); font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
+        .system-info .value { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--text-primary); }
 
-        /* Category Sections */
+        /* -- Filter Controls -- */
+        .filter-bar {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            padding: 0.45rem 1rem;
+            border-radius: 5px;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+        .filter-btn:hover { background: var(--bg-card-hover); }
+        .filter-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(124,108,240,0.06); }
+
+        /* -- Category Sections -- */
         .category-section {
             background: var(--bg-secondary);
             border: 1px solid var(--border);
@@ -434,42 +441,41 @@ function Generate-HtmlReport {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 1rem 1.25rem;
+            padding: 1rem 1.5rem;
             cursor: pointer;
             user-select: none;
             transition: background 0.2s;
         }
-
         .category-header:hover { background: var(--bg-card); }
 
-        .category-title { display: flex; align-items: center; gap: 0.75rem; }
-        .category-title h2 { font-size: 1rem; font-weight: 600; }
-        .category-icon { font-size: 1.25rem; }
+        .category-title { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+        .category-title h2 { font-size: 0.95rem; font-weight: 700; letter-spacing: 0.01em; }
         .category-badges { display: flex; gap: 0.5rem; }
 
         .badge {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             font-weight: 600;
-            padding: 0.15rem 0.5rem;
+            padding: 0.2rem 0.55rem;
             border-radius: 4px;
+            letter-spacing: 0.02em;
         }
 
         .badge-critical { background: var(--critical-bg); color: var(--critical); border: 1px solid var(--critical-border); }
         .badge-warning { background: var(--warning-bg); color: var(--warning); border: 1px solid var(--warning-border); }
         .badge-info { background: var(--info-bg); color: var(--info); border: 1px solid var(--info-border); }
 
-        .toggle-icon { color: var(--text-muted); font-size: 0.8rem; transition: transform 0.3s; }
+        .toggle-icon { color: var(--text-muted); font-size: 0.75rem; transition: transform 0.3s; }
         .collapsed .toggle-icon { transform: rotate(-90deg); }
         .collapsed + .category-body { display: none; }
-        .category-body { padding: 0 1.25rem 1.25rem; }
+        .category-body { padding: 0 1.5rem 1.5rem; }
 
-        /* Findings */
+        /* -- Findings -- */
         .finding {
             border-radius: 8px;
             margin-bottom: 0.75rem;
             overflow: hidden;
-            transition: transform 0.2s, box-shadow 0.3s;
+            transition: transform 0.15s;
         }
         .finding:hover { transform: translateX(2px); }
 
@@ -478,13 +484,11 @@ function Generate-HtmlReport {
             border: 1px solid var(--critical-border);
             border-left: 3px solid var(--critical);
         }
-
         .finding-warning {
             background: var(--warning-bg);
             border: 1px solid var(--warning-border);
             border-left: 3px solid var(--warning);
         }
-
         .finding-info {
             background: var(--info-bg);
             border: 1px solid var(--info-border);
@@ -494,138 +498,139 @@ function Generate-HtmlReport {
         .finding-header {
             display: flex;
             align-items: center;
-            gap: 0.75rem;
-            padding: 0.75rem 1rem;
+            gap: 0.65rem;
+            padding: 0.85rem 1.15rem;
             flex-wrap: wrap;
         }
 
+        .sev-indicator {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .sev-critical { background: var(--critical); box-shadow: 0 0 6px var(--critical); }
+        .sev-warning { background: var(--warning); box-shadow: 0 0 6px var(--warning); }
+        .sev-info { background: var(--info); }
+
         .finding-severity {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             font-weight: 700;
             white-space: nowrap;
+            letter-spacing: 0.04em;
         }
 
-        .finding-title { font-weight: 600; font-size: 0.9rem; }
+        .finding-title { font-weight: 600; font-size: 0.88rem; }
 
         .finding-body {
-            padding: 0 1rem 0.75rem;
-            font-size: 0.85rem;
+            padding: 0 1.15rem 0.85rem;
+            font-size: 0.83rem;
             color: var(--text-secondary);
+            line-height: 1.6;
         }
-
         .finding-body p { margin-bottom: 0.5rem; }
 
-        /* MITRE ATT&CK badges */
+        /* -- MITRE ATT&CK badges -- */
         .mitre-tags { display: inline-flex; gap: 0.35rem; margin-left: auto; flex-wrap: wrap; }
 
         .mitre-badge {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.6rem;
+            font-size: 0.58rem;
             font-weight: 600;
-            padding: 0.1rem 0.4rem;
+            padding: 0.12rem 0.45rem;
             border-radius: 3px;
-            background: rgba(139,92,246,0.1);
+            background: rgba(124,108,240,0.08);
             color: var(--accent);
-            border: 1px solid rgba(139,92,246,0.25);
+            border: 1px solid var(--accent-border);
             text-decoration: none;
             transition: all 0.2s;
             white-space: nowrap;
+            letter-spacing: 0.02em;
         }
         .mitre-badge:hover {
-            background: rgba(139,92,246,0.2);
+            background: rgba(124,108,240,0.16);
             border-color: var(--accent);
             color: #c4b5fd;
         }
 
+        /* -- Remediation -- */
         .finding-remediation {
-            background: rgba(139,92,246,0.04);
-            border-radius: 4px;
-            padding: 0.5rem 0.75rem;
+            background: rgba(124,108,240,0.04);
+            border-radius: 5px;
+            padding: 0.6rem 0.85rem;
             margin-top: 0.5rem;
-            font-size: 0.8rem;
+            font-size: 0.78rem;
             border-left: 3px solid var(--accent);
+            line-height: 1.6;
+        }
+
+        .remediation-label {
+            font-weight: 700;
+            color: var(--text-primary);
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
         }
 
         .ps-cmd {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.75rem;
-            background: rgba(0,0,0,0.3);
+            font-size: 0.72rem;
+            background: rgba(0,0,0,0.35);
             border: 1px solid var(--border);
-            padding: 0.15rem 0.4rem;
+            padding: 0.15rem 0.45rem;
             border-radius: 3px;
             cursor: pointer;
             color: var(--info);
-            position: relative;
             transition: background 0.2s, border-color 0.2s;
         }
-        .ps-cmd:hover { background: rgba(59,130,246,0.1); border-color: var(--info); }
+        .ps-cmd:hover { background: rgba(68,136,238,0.1); border-color: var(--info); }
         .ps-cmd.copied { border-color: var(--green); color: var(--green); }
-        .ps-cmd::after { content: ' ⧉'; font-size: 0.65rem; opacity: 0.5; }
-        .ps-cmd.copied::after { content: ' ✓'; opacity: 1; }
+        .ps-cmd::after { content: ' ^'; font-size: 0.6rem; opacity: 0.4; }
+        .ps-cmd.copied::after { content: ' ok'; opacity: 1; }
 
+        /* -- Details -- */
         .details-toggle {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.7rem;
+            font-size: 0.68rem;
             background: rgba(255,255,255,0.03);
             border: 1px solid var(--border);
             color: var(--text-muted);
-            padding: 0.25rem 0.75rem;
+            padding: 0.3rem 0.85rem;
             border-radius: 4px;
             cursor: pointer;
             margin-top: 0.5rem;
             transition: all 0.2s;
         }
-        .details-toggle:hover { background: rgba(255,255,255,0.08); }
+        .details-toggle:hover { background: rgba(255,255,255,0.06); color: var(--text-secondary); }
 
         .details-content {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.7rem;
+            font-size: 0.68rem;
             background: var(--bg-primary);
             border: 1px solid var(--border);
-            border-radius: 4px;
-            padding: 0.75rem;
+            border-radius: 5px;
+            padding: 0.85rem;
             margin-top: 0.5rem;
             overflow-x: auto;
             color: var(--text-secondary);
             white-space: pre-wrap;
             word-break: break-all;
+            line-height: 1.5;
         }
 
-        /* Filter Controls */
-        .filter-bar {
-            display: flex;
-            gap: 0.5rem;
-            margin-bottom: 1.5rem;
-            flex-wrap: wrap;
-        }
-
-        .filter-btn {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.75rem;
-            padding: 0.4rem 1rem;
-            border-radius: 6px;
-            border: 1px solid var(--border);
-            background: var(--bg-card);
-            color: var(--text-secondary);
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .filter-btn:hover { background: var(--bg-card-hover); }
-        .filter-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(139,92,246,0.08); }
-
-        /* Footer */
+        /* -- Footer -- */
         .report-footer {
             text-align: center;
-            padding: 2rem 0;
-            margin-top: 2rem;
+            padding: 2.5rem 0;
+            margin-top: 2.5rem;
             border-top: 1px solid var(--border);
             color: var(--text-muted);
-            font-size: 0.8rem;
+            font-size: 0.78rem;
+            line-height: 1.8;
         }
         .report-footer a { color: var(--accent); text-decoration: none; }
 
-        /* Notification toast */
+        /* -- Toast -- */
         .toast {
             position: fixed;
             bottom: 2rem;
@@ -634,7 +639,7 @@ function Generate-HtmlReport {
             border: 1px solid var(--green);
             color: var(--green);
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.75rem;
+            font-size: 0.72rem;
             padding: 0.5rem 1rem;
             border-radius: 6px;
             opacity: 0;
@@ -647,29 +652,30 @@ function Generate-HtmlReport {
 
         @media (max-width: 768px) {
             .stats-grid { grid-template-columns: repeat(2, 1fr); }
-            .container { padding: 1rem; }
-            .report-header h1 { font-size: 1.75rem; }
+            .container { padding: 1.25rem; }
+            .report-header h1 { font-size: 1.5rem; }
         }
 
         @media print {
-            body, body.terminal-mode::after { background: white !important; color: black !important; }
+            body, body.terminal-mode::after { background: white !important; color: #1a1a1a !important; }
             body.terminal-mode::after { display: none !important; }
             .filter-bar, .header-actions, .toast { display: none !important; }
-            .verdict-banner { animation: none !important; box-shadow: none !important; border-color: #333 !important; }
-            .finding { break-inside: avoid; animation: none !important; }
-            .report-header h1 { -webkit-text-fill-color: #333 !important; background: none !important; color: #333 !important; }
+            .verdict-banner { animation: none !important; box-shadow: none !important; border-color: #ccc !important; }
+            .finding { break-inside: avoid; }
+            .report-header h1 { -webkit-text-fill-color: #1a1a1a !important; background: none !important; color: #1a1a1a !important; }
             .category-body { display: block !important; }
             .details-content { display: block !important; background: #f5f5f5 !important; color: #333 !important; }
             .stat-card, .system-info, .category-section, .finding {
                 background: #fafafa !important; border-color: #ddd !important; color: #333 !important;
             }
-            .finding-remediation { border-left-color: #666 !important; background: #f0f0f0 !important; }
+            .finding-remediation { border-left-color: #888 !important; background: #f0f0f0 !important; }
             .ps-cmd { background: #e8e8e8 !important; color: #333 !important; border-color: #ccc !important; }
             .ps-cmd::after { display: none; }
             .stat-value, .verdict-label { color: #333 !important; }
             .report-footer, .system-info .label, .stat-label { color: #666 !important; }
             .badge { background: #eee !important; color: #333 !important; border-color: #ccc !important; }
             .mitre-badge { background: #eee !important; color: #555 !important; border-color: #ccc !important; }
+            .sev-indicator { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
         }
     </style>
 </head>
@@ -677,7 +683,7 @@ function Generate-HtmlReport {
     <div class="container">
         <div class="report-header">
             <h1>AM I HACKED?</h1>
-            <div class="subtitle">Windows Security Assessment Report &mdash; v${Version}</div>
+            <div class="subtitle">Security Assessment Report &mdash; v${Version}</div>
             <div class="header-actions">
                 <button class="header-btn" onclick="toggleTerminalMode(this)">Terminal Mode</button>
                 <button class="header-btn" onclick="expandAll()">Expand All</button>
@@ -687,15 +693,15 @@ function Generate-HtmlReport {
         </div>
 
         <div class="verdict-banner">
-            <div class="verdict-icon">${verdictIcon}</div>
+            <div class="verdict-icon icon-${verdictIcon}">$(switch ($verdictIcon) { "check" { "&#x2713;" } "warning" { "!" } "critical" { "&#x2715;" } })</div>
             <div class="verdict-label">${verdict}</div>
             <div class="verdict-message">${verdictMessage}</div>
         </div>
 
         <div class="score-section">
-            <div>
+            <div class="score-ring-wrap">
                 <div class="score-ring-container">
-                    <svg class="score-ring" viewBox="0 0 120 120" width="120" height="120">
+                    <svg class="score-ring" viewBox="0 0 120 120" width="110" height="110">
                         <circle class="score-ring-bg" cx="60" cy="60" r="52"/>
                         <circle class="score-ring-fill" cx="60" cy="60" r="52"
                             stroke="${scoreColor}"
@@ -749,7 +755,7 @@ function Generate-HtmlReport {
         ${findingsHtml}
 
         <div class="report-footer">
-            <p><strong>Am I Hacked?</strong> v${Version} &mdash; Generated $($SystemInfo.ScanTime.ToString('yyyy-MM-dd HH:mm:ss'))</p>
+            <p><strong>Am I Hacked?</strong> v${Version} &mdash; $($SystemInfo.ScanTime.ToString('yyyy-MM-dd HH:mm:ss'))</p>
             <p>This report is a point-in-time assessment. It does not guarantee security.</p>
             <p style="margin-top:0.5rem;"><a href="https://github.com/TMHSDigital/Am-I-Hacked">github.com/TMHSDigital/Am-I-Hacked</a></p>
         </div>
@@ -779,11 +785,7 @@ function Generate-HtmlReport {
             document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
             event.target.classList.add('active');
             document.querySelectorAll('.finding').forEach(f => {
-                if (level === 'all') {
-                    f.style.display = 'block';
-                } else {
-                    f.style.display = f.dataset.severity === level ? 'block' : 'none';
-                }
+                f.style.display = (level === 'all' || f.dataset.severity === level) ? 'block' : 'none';
             });
         }
 
@@ -805,8 +807,16 @@ function Generate-HtmlReport {
             });
         }
 
+        function collapseAll() {
+            document.querySelectorAll('.category-header').forEach(h => {
+                h.classList.add('collapsed');
+                const body = h.nextElementSibling;
+                if (body) body.style.display = 'none';
+            });
+        }
+
         function copyCmd(el) {
-            const text = el.textContent.replace(/ [⧉✓]$/, '');
+            const text = el.textContent.replace(/ [\^]$/, '').replace(/ ok$/, '');
             navigator.clipboard.writeText(text).then(() => {
                 el.classList.add('copied');
                 showToast('Copied to clipboard');
@@ -831,15 +841,6 @@ function Generate-HtmlReport {
             setTimeout(() => t.classList.remove('show'), 2000);
         }
 
-        function collapseAll() {
-            document.querySelectorAll('.category-header').forEach(h => {
-                h.classList.add('collapsed');
-                const body = h.nextElementSibling;
-                if (body) body.style.display = 'none';
-            });
-        }
-
-        // Auto-collapse INFO-only categories and animate score ring on load
         document.addEventListener('DOMContentLoaded', () => {
             document.querySelectorAll('.category-section').forEach(s => {
                 const hasCrit = s.querySelector('.finding-critical');
