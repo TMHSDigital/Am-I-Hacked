@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/banner.svg" alt="Am I Hacked?" width="900">
+# 🔴 Am I Hacked?
 
 **Zero-dependency Windows security assessment tool.**<br>
 **Finds compromise indicators. Generates an interactive HTML report. Maps everything to MITRE ATT&CK.**
