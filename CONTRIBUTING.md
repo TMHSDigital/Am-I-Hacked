@@ -96,11 +96,21 @@ Edit `config/config.example.json` to add (or `config/config.json` locally):
 
 ## Code Style
 
-- All `.ps1` files must use **UTF-8 BOM** encoding (PowerShell 5.1 reads files as Windows-1252 without it, breaking non-ASCII characters)
+- All `.ps1` files must use **UTF-8 BOM** encoding (PowerShell 5.1 reads files as Windows-1252 without it, breaking non-ASCII characters). Run `fix-bom.ps1` after any edit to re-apply the BOM (most editors and the Claude Code Edit tool strip it on save).
 - PowerShell verb-noun naming for functions
 - Consistent indentation (4 spaces)
 - Section headers with `# ── N. Section Name ──...` pattern
 - Status messages via `Write-Status`, not `Write-Host`
+
+### Git hooks (BOM enforcement)
+
+A pre-commit hook rejects commits that include `.ps1` files without a UTF-8 BOM. Activate it once per clone:
+
+```sh
+git config core.hooksPath .githooks
+```
+
+If the hook blocks your commit, run `fix-bom.ps1`, re-stage, and commit again.
 
 ## Submitting a PR
 

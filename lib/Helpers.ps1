@@ -547,7 +547,7 @@ function Compare-Baseline {
         $currentPorts = Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue |
             ForEach-Object { $_.LocalPort } | Sort-Object -Unique
         $oldPorts = $old.ListeningPorts | ForEach-Object { $_.Port } | Sort-Object -Unique
-        $newPorts = $currentPorts | Where-Object { $_ -notin $oldPorts }
+        $newPorts = $currentPorts | Where-Object { $_ -notin $oldPorts -and $_ -lt 49152 }  # skip ephemeral range
         foreach ($port in $newPorts) {
             Add-Finding -Severity "WARNING" -Category "Baseline" `
                 -Title "New Listening Port: $port" `

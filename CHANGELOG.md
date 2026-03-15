@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.3] - 2026-03-15
+
+### Added
+- **AMSI registry checks** -- detects `AmsiEnable=0` (CRITICAL, T1562.001) and missing PowerShell Script Block Logging (INFO, T1562.002)
+- **PS.Security preflight** -- detects when `Get-AuthenticodeSignature` is unavailable and emits a WARNING at scan startup listing affected checks
+- **`-SkipModules Baseline`** -- baseline comparison is now skippable, enabling faster targeted scans without baseline drift noise
+- **ASCII verdict box in CI mode** -- non-interactive output uses `+==+|` instead of Unicode box-drawing, preventing encoding issues in piped/agent output
+- **Pre-commit hook** -- `.githooks/pre-commit` rejects commits with `.ps1` files missing UTF-8 BOM
+
+### Fixed
+- **Unsigned process false positives** -- `Check-Processes.ps1` now uses `TrustedAppDirs` from config to skip processes in trusted directories (e.g. Git for Windows)
+- **Ephemeral port baseline noise** -- ports in the Windows dynamic range (49152-65535) are excluded from baseline diffs
+- Added `Git\usr\bin` to `TrustedAppDirs` in `config.example.json`
+
 ## [0.4.2] - 2026-03-15
 
 ### Fixed

@@ -66,7 +66,8 @@
     "1Password", "Bitwarden", "Proton", "node_modules",
     "OneDrive", "WindowsApps", "WinGet", "squirrel.windows",
     "Plutonium", "cursor", "Claude", "Amazon Games",
-    "NuGet", "npm", "pip", "cargo"
+    "NuGet", "npm", "pip", "cargo",
+    "Git\\usr\\bin"
   ],
   "TrustedDomainSuffixes": [
     ".microsoft.com", ".windowsupdate.com", ".akamaized.net",

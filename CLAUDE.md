@@ -83,7 +83,7 @@ Copied from `config/config.example.json`. Controls:
 
 ### Baseline System
 
-`-CreateBaseline` snapshots ports, services, accounts, Run keys, scheduled tasks, and Defender exclusions to JSON. Baselines are **never auto-overwritten** — this is intentional to prevent a compromised system from poisoning its own baseline.
+`-CreateBaseline` snapshots ports, services, accounts, Run keys, scheduled tasks, and Defender exclusions to JSON. Baselines are **never auto-overwritten** — this is intentional to prevent a compromised system from poisoning its own baseline. Baseline comparison can be skipped with `-SkipModules Baseline`. Ephemeral ports (49152-65535) are excluded from baseline diffs.
 
 ### Redaction System
 
@@ -102,7 +102,7 @@ Individual modules do not need to handle redaction.
 
 `-CIMode` makes the tool usable by AI terminal agents and CI pipelines:
 
-- Suppresses ASCII banner (plain-text header instead) and browser auto-open
+- Suppresses ASCII banner (plain-text header instead), uses ASCII-only verdict box, and suppresses browser auto-open
 - Auto-enables `-Redact` so operator identity is never leaked
 - Prints a JSON summary to stdout after all output, delimited by `---AMIHACKED-SUMMARY-JSON---`
 - Exits with structured code: 0 = clean, 1 = warnings, 2 = critical

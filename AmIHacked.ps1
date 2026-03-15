@@ -79,7 +79,7 @@ if ($script:NonInteractive) {
 }
 $script:RedactMap = @{}
 
-$script:Version = "0.4.2"
+$script:Version = "0.4.3"
 
 # ── Helpers (loaded first) ───────────────────────────────────────────────────
 
@@ -178,16 +178,29 @@ if ($script:RedactMode) {
 
 $defaultBaselinePath = Join-Path (Join-Path $PSScriptRoot "reports") "baseline_latest.json"
 
-if ($BaselinePath -and (Test-Path $BaselinePath)) {
-    Write-Section "Baseline Comparison"
-    Compare-Baseline -BaselinePath $BaselinePath
-} elseif (-not $BaselinePath -and (Test-Path $defaultBaselinePath)) {
-    Write-Section "Baseline Comparison"
-    Compare-Baseline -BaselinePath $defaultBaselinePath
-} elseif (-not $CreateBaseline) {
-    Add-Finding -Severity "INFO" -Category "General" -Title "No Baseline Found" `
-        -Description "No baseline snapshot exists for comparison. Run with -CreateBaseline on a known-clean system to enable change detection on future scans." `
-        -Remediation ".\AmIHacked.ps1 -CreateBaseline"
+if ('Baseline' -notin $SkipModules) {
+    if ($BaselinePath -and (Test-Path $BaselinePath)) {
+        Write-Section "Baseline Comparison"
+        Compare-Baseline -BaselinePath $BaselinePath
+    } elseif (-not $BaselinePath -and (Test-Path $defaultBaselinePath)) {
+        Write-Section "Baseline Comparison"
+        Compare-Baseline -BaselinePath $defaultBaselinePath
+    } elseif (-not $CreateBaseline) {
+        Add-Finding -Severity "INFO" -Category "General" -Title "No Baseline Found" `
+            -Description "No baseline snapshot exists for comparison. Run with -CreateBaseline on a known-clean system to enable change detection on future scans." `
+            -Remediation ".\AmIHacked.ps1 -CreateBaseline"
+    }
+}
+
+# ── Preflight: Signature Verification Capability ─────────────────────────────
+
+Import-Module Microsoft.PowerShell.Security -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue 2>$null
+$script:SignatureCheckAvailable = $null -ne (Get-Command Get-AuthenticodeSignature -ErrorAction SilentlyContinue)
+if (-not $script:SignatureCheckAvailable) {
+    Add-Finding -Severity "WARNING" -Category "General" `
+        -Title "Signature Verification Degraded" `
+        -Description "The PowerShell Security module (Microsoft.PowerShell.Security) could not be loaded in this session. Authenticode signature checks will be skipped or may produce false positives. Affected checks: AMSI DLL integrity, COM hijack detection, unsigned process/file detection." `
+        -Remediation "Run the scan in a fresh PowerShell session. If the issue persists, run 'sfc /scannow' to repair PowerShell modules."
 }
 
 # ── Dynamic Module Discovery ─────────────────────────────────────────────────
@@ -318,40 +331,65 @@ $w = 44
 
 Write-Host ""
 Write-Host ""
-Write-Host "  ╔$('═' * $w)╗" -ForegroundColor DarkCyan
-Write-Host "  ║" -NoNewline -ForegroundColor DarkCyan
-$verdictPad = $verdict.PadLeft([math]::Floor(($w + $verdict.Length) / 2)).PadRight($w)
-Write-Host $verdictPad -NoNewline -ForegroundColor $verdictColor
-Write-Host "║" -ForegroundColor DarkCyan
-Write-Host "  ╠$('═' * $w)╣" -ForegroundColor DarkCyan
 
-function Write-SummaryLine { param($Label, $Value, $Color, $Width)
-    $content = "$Label$Value"
-    $innerWidth = $Width - 4
-    $padded = $content.PadRight($innerWidth)
-    Write-Host "  ║  " -NoNewline -ForegroundColor DarkCyan
-    Write-Host $Label -NoNewline -ForegroundColor DarkGray
-    Write-Host $Value -NoNewline -ForegroundColor $Color
-    $remaining = $innerWidth - $content.Length
-    if ($remaining -gt 0) { Write-Host (' ' * $remaining) -NoNewline }
-    Write-Host "  ║" -ForegroundColor DarkCyan
+if ($script:NonInteractive) {
+    # ASCII-only box for CI/agent environments (avoids encoding issues in piped output)
+    $hbar = '=' * ($w + 2)
+    Write-Host "  +$hbar+"
+    $verdictPad = $verdict.PadLeft([math]::Floor(($w + 2 + $verdict.Length) / 2)).PadRight($w + 2)
+    Write-Host "  |$verdictPad|"
+    Write-Host "  +$hbar+"
+
+    function Write-SummaryLine { param($Label, $Value, $Color, $Width)
+        $content = "  $Label$Value"
+        $innerWidth = $Width - 2
+        $line = "  | $Label$Value".PadRight($Width + 3) + " |"
+        Write-Host $line
+    }
+
+    Write-SummaryLine "CRITICAL  " "$critCount" "Red" $w
+    Write-SummaryLine "WARNING   " "$warnCount" "Yellow" $w
+    Write-SummaryLine "INFO      " "$infoCount" "DarkCyan" $w
+    Write-Host "  |  $(' ' * ($w - 2))  |"
+    Write-SummaryLine "Total     " "$totalCount findings" "White" $w
+    Write-SummaryLine "Duration  " "$durationStr" "DarkGray" $w
+    Write-Host "  |  $(' ' * ($w - 2))  |"
+    Write-SummaryLine "Report    " "See path below" "DarkGray" $w
+    Write-Host "  +$hbar+"
+} else {
+    Write-Host "  ╔$('═' * $w)╗" -ForegroundColor DarkCyan
+    Write-Host "  ║" -NoNewline -ForegroundColor DarkCyan
+    $verdictPad = $verdict.PadLeft([math]::Floor(($w + $verdict.Length) / 2)).PadRight($w)
+    Write-Host $verdictPad -NoNewline -ForegroundColor $verdictColor
+    Write-Host "║" -ForegroundColor DarkCyan
+    Write-Host "  ╠$('═' * $w)╣" -ForegroundColor DarkCyan
+
+    function Write-SummaryLine { param($Label, $Value, $Color, $Width)
+        $content = "$Label$Value"
+        $innerWidth = $Width - 4
+        Write-Host "  ║  " -NoNewline -ForegroundColor DarkCyan
+        Write-Host $Label -NoNewline -ForegroundColor DarkGray
+        Write-Host $Value -NoNewline -ForegroundColor $Color
+        $remaining = $innerWidth - $content.Length
+        if ($remaining -gt 0) { Write-Host (' ' * $remaining) -NoNewline }
+        Write-Host "  ║" -ForegroundColor DarkCyan
+    }
+
+    Write-SummaryLine "CRITICAL  " "$critCount" $(if ($critCount -gt 0) { "Red" } else { "Green" }) $w
+    Write-SummaryLine "WARNING   " "$warnCount" $(if ($warnCount -gt 0) { "Yellow" } else { "Green" }) $w
+    Write-SummaryLine "INFO      " "$infoCount" "DarkCyan" $w
+    Write-Host "  ║$(' ' * $w)║" -ForegroundColor DarkCyan
+    Write-SummaryLine "Total     " "$totalCount findings" "White" $w
+    Write-SummaryLine "Duration  " "$durationStr" "DarkGray" $w
+    Write-Host "  ║$(' ' * $w)║" -ForegroundColor DarkCyan
+    Write-SummaryLine "Report    " "See path below" "DarkGray" $w
+    Write-Host "  ╚$('═' * $w)╝" -ForegroundColor DarkCyan
 }
 
-Write-SummaryLine "CRITICAL  " "$critCount" $(if ($critCount -gt 0) { "Red" } else { "Green" }) $w
-Write-SummaryLine "WARNING   " "$warnCount" $(if ($warnCount -gt 0) { "Yellow" } else { "Green" }) $w
-Write-SummaryLine "INFO      " "$infoCount" "DarkCyan" $w
-Write-Host "  ║$(' ' * $w)║" -ForegroundColor DarkCyan
-
-Write-SummaryLine "Total     " "$totalCount findings" "White" $w
-Write-SummaryLine "Duration  " "$durationStr" "DarkGray" $w
-Write-Host "  ║$(' ' * $w)║" -ForegroundColor DarkCyan
-Write-SummaryLine "Report    " "See path below" "DarkGray" $w
-
-Write-Host "  ╚$('═' * $w)╝" -ForegroundColor DarkCyan
 Write-Host ""
 
 if ($critCount -gt 0) {
-    Write-Host "  ██ CRITICAL findings detected. Review the report immediately." -ForegroundColor Red
+    Write-Host "  !! CRITICAL findings detected. Review the report immediately." -ForegroundColor Red
 } elseif ($warnCount -eq 0 -and $critCount -eq 0) {
     Write-Host "  [+] No threats detected. System appears clean." -ForegroundColor Green
 }

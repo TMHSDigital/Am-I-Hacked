@@ -1,0 +1,27 @@
+#!/bin/sh
+# Pre-commit hook: enforce UTF-8 BOM on all staged .ps1 files.
+# PowerShell 5.1 reads files without BOM as Windows-1252, which corrupts
+# non-ASCII characters (box-drawing, checkmarks) and causes parse errors.
+
+missing=""
+
+for file in $(git diff --cached --name-only --diff-filter=ACM | grep '\.ps1$'); do
+    # Read first 3 bytes and check for UTF-8 BOM (EF BB BF)
+    bom=$(head -c 3 "$file" | od -An -tx1 | tr -d ' \n')
+    if [ "$bom" != "efbbbf" ]; then
+        missing="$missing\n  $file"
+    fi
+done
+
+if [ -n "$missing" ]; then
+    echo ""
+    echo "ERROR: The following .ps1 files are missing a UTF-8 BOM:"
+    printf "$missing\n"
+    echo ""
+    echo "Fix by running: pwsh -File fix-bom.ps1  (or: powershell -File fix-bom.ps1)"
+    echo "Then re-stage the files and commit again."
+    echo ""
+    exit 1
+fi
+
+exit 0

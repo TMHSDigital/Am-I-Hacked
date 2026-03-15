@@ -89,6 +89,30 @@ function Invoke-DefenseEvasionChecks {
         }
     } catch {}
 
+    try {
+        $amsiEnable = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows Script\Settings" -Name "AmsiEnable" -ErrorAction SilentlyContinue
+        if ($amsiEnable -and $amsiEnable.AmsiEnable -eq 0) {
+            Add-Finding -Severity "CRITICAL" -Category "DefenseEvasion" `
+                -Title "AMSI Explicitly Disabled via Registry" `
+                -Description "HKLM:\SOFTWARE\Microsoft\Windows Script\Settings!AmsiEnable is set to 0. This explicitly disables AMSI for Windows Script Host (VBScript, JScript), allowing malicious scripts to run without AV scanning." `
+                -Remediation "Remove-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows Script\Settings' -Name 'AmsiEnable'" `
+                -Details @{ Key = "HKLM:\SOFTWARE\Microsoft\Windows Script\Settings\AmsiEnable"; Value = 0 } `
+                -MITRE @("T1562.001")
+        }
+    } catch {}
+
+    try {
+        $sbl = Get-ItemProperty "HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging" -ErrorAction SilentlyContinue
+        if (-not $sbl -or -not $sbl.EnableScriptBlockLogging -or $sbl.EnableScriptBlockLogging -eq 0) {
+            Add-Finding -Severity "INFO" -Category "DefenseEvasion" `
+                -Title "PowerShell Script Block Logging Not Enabled" `
+                -Description "Script block logging is not enabled via policy. When enabled, PowerShell logs all executed script blocks to the event log (Event ID 4104), which is valuable for detecting obfuscated or malicious scripts." `
+                -Remediation "Set-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging' -Name EnableScriptBlockLogging -Value 1" `
+                -Details @{ Key = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging\EnableScriptBlockLogging"; Value = "absent or 0" } `
+                -MITRE @("T1562.002")
+        }
+    } catch {}
+
     # ── 3. Windows Defender Real-Time Protection ─────────────────────────
 
     Write-Status "Checking Defender real-time protection..."
