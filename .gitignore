@@ -13,5 +13,8 @@ desktop.ini
 # IDE
 .vscode/
 .idea/
+
+# Claude Code local config and memory
+.claude/
 *.swp
 *.swo
