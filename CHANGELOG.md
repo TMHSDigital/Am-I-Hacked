@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.9] - 2026-03-15
+
+### Added
+- **WinRM listener detection** -- flags ports 5985/5986 if not in TrustedPorts (WARNING, T1021.006)
+- **SSH listener detection** -- flags port 22 if not in TrustedPorts (INFO, T1021.004)
+- **Test assertions** -- `Assert-FindingCount` for Network and DefenseEvasion modules
+
+### Fixed
+- **TrustedCompanies config drift** -- `Get-DefaultConfig` expanded from 9 to 38 entries, synced with `config.example.json`
+- **Report HTML injection hardening** -- finding details now use `[System.Net.WebUtility]::HtmlEncode()` instead of manual `<`/`>` replacement
+- **Score formula documented** -- added comment explaining penalty weights and cap behavior
+
 ## [0.4.8] - 2026-03-15
 
 ### Added

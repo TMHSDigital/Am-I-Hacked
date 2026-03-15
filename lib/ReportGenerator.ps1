@@ -18,6 +18,7 @@ function Generate-HtmlReport {
     $infoCount = ($Findings | Where-Object { $_.Severity -eq "INFO" }).Count
     $totalCount = $Findings.Count
 
+    # Score weights: CRITICAL=-25, WARNING=-5, INFO=-0.5; result clamped to [0,100] (4+ criticals always score 0)
     $penalty = ($critCount * 25) + ($warnCount * 5) + ($infoCount * 0.5)
     $score = [math]::Max(0, [math]::Min(100, [math]::Round(100 - $penalty)))
     $scoreColor = if ($score -ge 80) { "#22c55e" } elseif ($score -ge 50) { "#f59e0b" } else { "#ef4444" }
@@ -110,7 +111,7 @@ function Generate-HtmlReport {
                 $detailsHtml = @"
                 <div class="finding-details">
                     <button class="details-toggle" onclick="toggleDetails(this)">Show Technical Details</button>
-                    <pre class="details-content" style="display:none;">$($finding.Details | ConvertTo-Json -Depth 3 | ForEach-Object { $_ -replace '<','&lt;' -replace '>','&gt;' })</pre>
+                    <pre class="details-content" style="display:none;">$([System.Net.WebUtility]::HtmlEncode(($finding.Details | ConvertTo-Json -Depth 3)))</pre>
                 </div>
 "@
             }

@@ -281,7 +281,18 @@ function Get-DefaultConfig {
         TrustedCompanies = @(
             "Microsoft Corporation", "Google LLC", "Slack Technologies",
             "Spotify AB", "Discord Inc.", "Mozilla Corporation",
-            "Apple Inc.", "Adobe Inc.", "Valve Corporation"
+            "Apple Inc.", "Adobe Inc.", "Valve Corporation",
+            "GitHub, Inc.", "GitHub", "Node.js Foundation", "OpenJS Foundation",
+            "Rockstar Games", "Cfx.re", "Python Software Foundation",
+            "NVIDIA Corporation", "Intel Corporation", "Samsung Electronics",
+            "Amazon.com Services LLC", "Amazon Web Services",
+            "Proton AG", "Notion Labs, Inc.", "LM Studio", "Anthropic",
+            "JetBrains s.r.o.", "Docker Inc", "Canonical Ltd.",
+            "Postman Inc.", "Activision Publishing", "Blizzard Entertainment",
+            "Electronic Arts", "Epic Games", "Ubisoft",
+            "Dropbox, Inc.", "Zoom Video Communications, Inc.",
+            "1Password", "AgileBits Inc.", "Bitwarden Inc.",
+            "The Chromium Authors", "The Electron Authors"
         )
 
         TrustedAppDirs = @()

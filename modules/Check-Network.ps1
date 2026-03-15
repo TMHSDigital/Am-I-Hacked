@@ -205,6 +205,34 @@ function Invoke-NetworkChecks {
             -MITRE @("T1571")
     }
 
+    # WinRM and SSH listeners — always check regardless of commonListenPorts exclusions
+    $specialListeners = @(
+        @{ Port = 5985; Severity = "WARNING"; Title = "WinRM Listener Active: port 5985"; MITRE = "T1021.006"
+           Description = "WinRM (HTTP) is listening on port 5985. WinRM enables remote PowerShell command execution and is commonly abused by attackers for lateral movement."
+           Remediation = "If WinRM is not required, disable it: 'Disable-PSRemoting -Force'. Restrict access with firewall rules if it must remain enabled." }
+        @{ Port = 5986; Severity = "WARNING"; Title = "WinRM Listener Active: port 5986"; MITRE = "T1021.006"
+           Description = "WinRM (HTTPS) is listening on port 5986. WinRM enables remote PowerShell command execution and is commonly abused by attackers for lateral movement."
+           Remediation = "If WinRM is not required, disable it: 'Disable-PSRemoting -Force'. Restrict access with firewall rules if it must remain enabled." }
+        @{ Port = 22;   Severity = "INFO";    Title = "SSH Listener Active";             MITRE = "T1021.004"
+           Description = "An OpenSSH server is listening on port 22. SSH enables remote command execution; verify this service is intentional and that key-based authentication is enforced."
+           Remediation = "If SSH is not required, stop and disable the OpenSSH Server service. If required, ensure 'PasswordAuthentication no' is set in sshd_config and restrict access via firewall." }
+    )
+    foreach ($check in $specialListeners) {
+        if ($trustedPorts -contains $check.Port) { continue }
+        $match = $listeners | Where-Object { $_.LocalPort -eq $check.Port -and ($_.LocalAddress -eq "0.0.0.0" -or $_.LocalAddress -eq "::") }
+        if ($match) {
+            $procId = $match[0].OwningProcess
+            $proc = $procLookup[$procId]
+            $procName = if ($proc) { $proc.Name } else { "Unknown (PID: $procId)" }
+            Add-Finding -Severity $check.Severity -Category "Network" `
+                -Title $check.Title `
+                -Description "$($check.Description) Process: '$procName'." `
+                -Remediation $check.Remediation `
+                -Details @{ Port = $check.Port; Process = $procName; PID = $procId } `
+                -MITRE @($check.MITRE)
+        }
+    }
+
     # ── 4. DNS Configuration ─────────────────────────────────────────────
 
     Write-Status "Checking DNS configuration..."

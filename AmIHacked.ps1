@@ -80,7 +80,7 @@ if ($script:NonInteractive) {
 $script:RedactMap = @{}
 $script:SuppressedCount = 0
 
-$script:Version = "0.4.8"
+$script:Version = "0.4.9"
 
 # ── Helpers (loaded first) ───────────────────────────────────────────────────
 

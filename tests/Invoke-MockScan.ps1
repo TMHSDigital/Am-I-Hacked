@@ -133,8 +133,10 @@ if (-not $jsonFiles) {
 
     # Category coverage: each active module should produce at least one finding
     Write-TestHeader "Module Coverage"
-    Assert-FindingCount -Findings $findings -Category "FileSystem" -MinCount 1 -TestName "FileSystem module produced findings"
-    Assert-FindingCount -Findings $findings -Category "General"    -MinCount 1 -TestName "General module produced findings"
+    Assert-FindingCount -Findings $findings -Category "FileSystem"     -MinCount 1 -TestName "FileSystem module produced findings"
+    Assert-FindingCount -Findings $findings -Category "General"        -MinCount 1 -TestName "General module produced findings"
+    Assert-FindingCount -Findings $findings -Category "Network"        -MinCount 1 -TestName "Network module produced findings"
+    Assert-FindingCount -Findings $findings -Category "DefenseEvasion" -MinCount 1 -TestName "DefenseEvasion module produced findings"
 
     # Severity field is always one of the three valid values
     Write-TestHeader "Severity Field Validity"
