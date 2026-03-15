@@ -42,9 +42,9 @@
 
 [CmdletBinding()]
 param(
-    [string]$OutputPath = (Join-Path $PSScriptRoot "reports"),
+    [string]$OutputPath = "",
     [string[]]$SkipModules = @(),
-    [string]$ConfigPath = (Join-Path $PSScriptRoot "config\config.json"),
+    [string]$ConfigPath = "",
     [switch]$Offline,
     [string]$BaselinePath,
     [switch]$CreateBaseline,
@@ -59,6 +59,8 @@ param(
 if (-not $PSScriptRoot) {
     $PSScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 }
+if (-not $OutputPath) { $OutputPath = Join-Path $PSScriptRoot "reports" }
+if (-not $ConfigPath) { $ConfigPath = Join-Path $PSScriptRoot "config\config.json" }
 
 # ── Bootstrap ────────────────────────────────────────────────────────────────
 
@@ -77,7 +79,7 @@ if ($script:NonInteractive) {
 }
 $script:RedactMap = @{}
 
-$script:Version = "0.4.0"
+$script:Version = "0.4.1"
 
 # ── Helpers (loaded first) ───────────────────────────────────────────────────
 

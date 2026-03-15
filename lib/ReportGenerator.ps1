@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Generates a polished HTML report from scan findings.
 #>

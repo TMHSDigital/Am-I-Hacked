@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.1] - 2026-03-15
+
+### Fixed
+- **UTF-8 BOM** -- all `.ps1` files now use UTF-8 BOM encoding, fixing parse errors on PowerShell 5.1 where non-ASCII characters (checkmarks, box-drawing) were misinterpreted as string delimiters
+- **`$PSScriptRoot` in `param()`** -- path parameter defaults no longer reference `$PSScriptRoot` (unavailable during `param()` evaluation with `powershell.exe -File`); resolved in the script body instead
+
 ## [0.4.0] - 2026-03-15
 
 ### Added

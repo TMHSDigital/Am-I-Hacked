@@ -96,6 +96,7 @@ Edit `config/config.example.json` to add (or `config/config.json` locally):
 
 ## Code Style
 
+- All `.ps1` files must use **UTF-8 BOM** encoding (PowerShell 5.1 reads files as Windows-1252 without it, breaking non-ASCII characters)
 - PowerShell verb-noun naming for functions
 - Consistent indentation (4 spaces)
 - Section headers with `# ── N. Section Name ──...` pattern

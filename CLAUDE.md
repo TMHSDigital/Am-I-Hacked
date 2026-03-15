@@ -123,7 +123,7 @@ $jsonLine = ($output -join "`n" -split "---AMIHACKED-SUMMARY-JSON---")[-1].Trim(
 $summary = $jsonLine | ConvertFrom-Json
 ```
 
-`$PSScriptRoot` has a fallback for `powershell.exe -File` invocation (where it would otherwise be empty).
+`$PSScriptRoot` is empty during `param()` evaluation when invoked via `powershell.exe -File`. Path parameter defaults (`OutputPath`, `ConfigPath`) use empty strings and are resolved in the script body after the `$PSScriptRoot` fallback runs.
 
 ## Module Overview
 
@@ -135,6 +135,7 @@ $summary = $jsonLine | ConvertFrom-Json
 | `Check-FileSystem.ps1` | Modified system binaries, temp-dir executables, VirusTotal lookups, ADS, 8 persistence mechanisms |
 | `Check-DefenseEvasion.ps1` | Cleared event logs, AMSI tampering, Defender status, ETW tampering |
 
-## Contributing New Modules
+## Code Conventions
 
-See `CONTRIBUTING.md` for the full module authoring guide and test harness documentation.
+- All `.ps1` files **must** be saved with UTF-8 BOM encoding. PowerShell 5.1 defaults to Windows-1252, which corrupts non-ASCII characters (checkmarks, box-drawing) and causes parse errors.
+- See `CONTRIBUTING.md` for the full module authoring guide and test harness documentation.

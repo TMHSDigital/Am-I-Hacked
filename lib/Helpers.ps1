@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Shared helper functions for Am I Hacked modules.
 #>

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Test harness for Am I Hacked — creates safe mock IOCs and validates detection.
 .DESCRIPTION
