@@ -79,7 +79,7 @@ if ($script:NonInteractive) {
 }
 $script:RedactMap = @{}
 
-$script:Version = "0.4.1"
+$script:Version = "0.4.2"
 
 # ── Helpers (loaded first) ───────────────────────────────────────────────────
 

@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.2] - 2026-03-15
+
+### Fixed
+- **AMSI false CRITICAL** -- `Get-AuthenticodeSignature` fails silently in some PS 5.1 `-File` sessions; `Get-FileSignature` now returns a `CheckFailed` sentinel so callers distinguish module failures from unsigned files
+- **Scanner self-contamination** -- `remoteIpMoProxy_*` temp files created by the scanner's own CIM/WMI calls are no longer flagged as suspicious
+- **Stale COM registrations** -- HKCU COM overrides where the DLL no longer exists on disk are now skipped (inert registrations can't be exploited)
+- **Known-legitimate scheduled tasks** -- OneDrive, Opera, Zoom, Discord, and Teams updater tasks are no longer flagged as persistence
+- **Per-user session services** -- baseline diffs now skip Windows per-user service instances (e.g. `AarSvc_ddff8`) that change every login session
+- **`$args` shadowing** -- renamed to `$taskArgs` in scheduled task checks to avoid shadowing PowerShell's automatic variable
+- Restored Unicode box-drawing on verdict summary top border
+
 ## [0.4.1] - 2026-03-15
 
 ### Fixed
