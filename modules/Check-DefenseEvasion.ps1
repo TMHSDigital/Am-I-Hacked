@@ -245,4 +245,108 @@ function Invoke-DefenseEvasionChecks {
         Write-Verbose "Could not check Defender TamperProtection: $_"
     }
 
+    # ── 6. PowerShell Profile Injection ──────────────────────────────────
+
+    Write-Status "Checking PowerShell profiles for injection..."
+
+    try {
+        $profilePaths = @(
+            @{ Name = "AllUsersAllHosts";       Path = $PROFILE.AllUsersAllHosts },
+            @{ Name = "AllUsersCurrentHost";    Path = $PROFILE.AllUsersCurrentHost },
+            @{ Name = "CurrentUserAllHosts";    Path = $PROFILE.CurrentUserAllHosts },
+            @{ Name = "CurrentUserCurrentHost"; Path = $PROFILE.CurrentUserCurrentHost }
+        )
+
+        $suspiciousPatterns = @(
+            'Download',
+            'IEX\b',
+            'Invoke-Expression',
+            '\-[Ee]nc\b',
+            '\-EncodedCommand',
+            'Net\.WebClient',
+            'Start-Process\s+.*-WindowStyle\s+Hidden',
+            '[Hh]idden',
+            '[Bb]ypass',
+            'New-Object\s+System\.Net',
+            'DownloadString',
+            'DownloadFile',
+            'Invoke-WebRequest',
+            'Invoke-RestMethod',
+            'bitstransfer',
+            'FromBase64String'
+        )
+        $combinedPattern = ($suspiciousPatterns -join '|')
+
+        foreach ($profile in $profilePaths) {
+            if (-not $profile.Path -or -not (Test-Path $profile.Path)) { continue }
+
+            $content = Get-Content $profile.Path -Raw -ErrorAction SilentlyContinue
+            if (-not $content) { continue }
+
+            $matched = $suspiciousPatterns | Where-Object { $content -match $_ }
+            if ($matched) {
+                $fileInfo = Get-Item $profile.Path -ErrorAction SilentlyContinue
+                Add-Finding -Severity "WARNING" -Category "DefenseEvasion" `
+                    -Title "Suspicious PowerShell Profile: $($profile.Name)" `
+                    -Description "The PowerShell profile '$($profile.Name)' at '$($profile.Path)' contains suspicious patterns. Attackers inject code into PS profiles to execute malicious commands on every PowerShell session. Matched patterns: $($matched -join ', ')." `
+                    -Remediation "Review the profile content: Get-Content '$($profile.Path)'. Remove suspicious lines or rename the file." `
+                    -Details @{
+                        Path            = $profile.Path
+                        ProfileName     = $profile.Name
+                        FileSize        = if ($fileInfo) { $fileInfo.Length } else { 0 }
+                        LastModified    = if ($fileInfo) { $fileInfo.LastWriteTime } else { $null }
+                        MatchedPatterns = $matched
+                    } `
+                    -MITRE @("T1546.013")
+            }
+        }
+    } catch {
+        Write-Verbose "Could not check PowerShell profiles: $_"
+    }
+
+    # ── 7. Certificate Store Anomaly Detection ───────────────────────────
+
+    Write-Status "Checking root certificate store for anomalies..."
+
+    try {
+        $knownCAs = @(
+            'Microsoft', 'DigiCert', 'GlobalSign', 'Comodo', 'Sectigo', 'VeriSign',
+            'Symantec', 'GeoTrust', 'Thawte', "Let's Encrypt", 'ISRG Root', 'Entrust',
+            'GoDaddy', 'Starfield', 'Amazon', 'Baltimore CyberTrust', 'Cybertrust',
+            'QuoVadis', 'USERTrust', 'AAA Certificate Services', 'AddTrust', 'Certum',
+            'CNNIC', 'D-TRUST', 'eMudhra', 'E-Tugra', 'Hongkong Post', 'SECOM',
+            'SwissSign', 'T-TeleSec', 'TWCA', 'TeliaSonera', 'Actalis', 'Buypass',
+            'Certigna', 'IdenTrust', 'NetLock', 'OISTE', 'WISeKey', 'SSL.com',
+            'Trustwave', 'Staat der Nederlanden', 'Government', 'AC RAIZ', 'ACCVRAIZ',
+            'CFCA', 'XRamp'
+        )
+
+        $rootCerts = Get-ChildItem "Cert:\LocalMachine\Root" -ErrorAction SilentlyContinue
+        foreach ($cert in $rootCerts) {
+            $subjectOrFriendly = if ($cert.Subject) { $cert.Subject } else { $cert.FriendlyName }
+            $isKnown = $false
+            foreach ($ca in $knownCAs) {
+                if ($subjectOrFriendly -like "*$ca*") { $isKnown = $true; break }
+            }
+            if (-not $isKnown) {
+                $displayName = if ($cert.Subject -match 'CN=([^,]+)') { $Matches[1] } else { $cert.Subject.Substring(0, [math]::Min(60, $cert.Subject.Length)) }
+                Add-Finding -Severity "WARNING" -Category "DefenseEvasion" `
+                    -Title "Unknown Root CA: $displayName" `
+                    -Description "Root certificate '$($cert.Subject)' in Cert:\LocalMachine\Root is not in the well-known CA list. This could be a corporate proxy CA (benign) or a rogue certificate installed by malware to intercept HTTPS traffic via MITM." `
+                    -Remediation "Review the certificate in certlm.msc. If unexpected, remove it: Remove-Item 'Cert:\LocalMachine\Root\$($cert.Thumbprint)'" `
+                    -Details @{
+                        Subject      = $cert.Subject
+                        Thumbprint   = $cert.Thumbprint
+                        NotBefore    = $cert.NotBefore
+                        NotAfter     = $cert.NotAfter
+                        FriendlyName = $cert.FriendlyName
+                        Issuer       = $cert.Issuer
+                    } `
+                    -MITRE @("T1553.004")
+            }
+        }
+    } catch {
+        Write-Status "Could not check root certificate store: $_" -Color Yellow
+    }
+
 }

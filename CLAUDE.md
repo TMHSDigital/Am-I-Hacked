@@ -134,7 +134,17 @@ $summary = $jsonLine | ConvertFrom-Json
 | `Check-Network.ps1` | External connections, reverse-DNS, AbuseIPDB lookups, firewall rules |
 | `Check-Accounts.ps1` | Hidden/new accounts, brute-force indicators, RDP history, LSA protection |
 | `Check-FileSystem.ps1` | Modified system binaries, temp-dir executables, VirusTotal lookups, ADS, 8 persistence mechanisms |
-| `Check-DefenseEvasion.ps1` | Cleared event logs, AMSI tampering, Defender status, ETW tampering |
+| `Check-DefenseEvasion.ps1` | Cleared event logs, AMSI tampering, Defender status, ETW tampering, PS profile injection, root CA anomalies |
+
+## Prompt Handoff (Cursor ↔ Claude Code)
+
+`claude_code_prompt.md` (gitignored) is the shared prompt file. Cursor writes implementation prompts to it; Claude Code reads and executes them via:
+
+```
+Read claude_code_prompt.md and follow all instructions in it.
+```
+
+The file is overwritten for each new prompt. Claude Code prompts must **not** change versioning, documentation, or changelog -- Cursor handles those after reviewing the diff.
 
 ## Code Conventions
 

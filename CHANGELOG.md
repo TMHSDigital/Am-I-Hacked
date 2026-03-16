@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.0] - 2026-03-16
+
+### Added
+- **PowerShell profile injection detection** -- scans all four `$PROFILE` paths for suspicious patterns (IEX, encoded commands, download cradles, etc.) and emits WARNING + T1546.013
+- **Root certificate store anomaly detection** -- compares `Cert:\LocalMachine\Root` against 46 well-known CA name fragments; flags unknown root CAs as WARNING + T1553.004 (catches rogue MITM certs)
+- **Category breakdown chart in HTML report** -- stacked horizontal bar chart showing finding counts per module/category, placed between the stats grid and system info
+- **Improved remediation click-to-copy** -- regex now also matches system commands (`sfc`, `netsh`, `reg`, `certutil`, `dism`, etc.) and the `Import-` verb prefix
+
+### Changed
+- Version bumped to 0.5.0
+- SECURITY.md updated to mark 0.5.x as supported, 0.3.x as unsupported
+
 ## [0.4.9] - 2026-03-15
 
 ### Added

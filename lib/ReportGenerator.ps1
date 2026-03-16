@@ -119,7 +119,11 @@ function Generate-HtmlReport {
             $remediationHtml = ""
             if ($finding.Remediation) {
                 $escapedRemediation = $finding.Remediation -replace '<','&lt;' -replace '>','&gt;'
-                $remediationWithCopy = $escapedRemediation -replace '((?:Remove-|Set-|Disable-|Enable-|Get-|Stop-|Start-|Update-|New-|Add-|Unregister-)[A-Za-z\-]+(?:\s+[^\r\n]*?)?)(?=\s*$|\.)', '<code class="ps-cmd" onclick="copyCmd(this)">$1</code>'
+                $remediationWithCopy = $escapedRemediation -replace '(?:^|(?<=\s))((Remove-|Set-|Disable-|Enable-|Get-|Stop-|Start-|Update-|New-|Add-|Unregister-|Import-)[A-Za-z\-]+(?:\s+[^\r\n]*?)?)(?=\s*$|\.(?:\s|$))', '<code class="ps-cmd" onclick="copyCmd(this)">$1</code>'
+                $sysPattern = @'
+(?:^|(?<=[\s'"]))((sfc|netsh|reg|certutil|bitsadmin|wevtutil|bcdedit|sc|icacls|takeown|dism)\s+[^\r\n.]*?)(?=\s*$|\.(?:\s|$))
+'@
+                $remediationWithCopy = $remediationWithCopy -replace $sysPattern, '<code class="ps-cmd" onclick="copyCmd(this)">$1</code>'
                 $remediationHtml = "<div class='finding-remediation'><span class='remediation-label'>Remediation:</span> $remediationWithCopy</div>"
             }
 
@@ -146,6 +150,39 @@ function Generate-HtmlReport {
             </div>
         </div>
 "@
+    }
+
+    $categoryChartHtml = ""
+    if ($categories.Count -gt 0) {
+        $maxCatCount = ($categories | ForEach-Object { $_.Count } | Measure-Object -Maximum).Maximum
+        $chartRows = ""
+        foreach ($cat in $categories) {
+            $catCritC  = ($cat.Group | Where-Object { $_.Severity -eq "CRITICAL" }).Count
+            $catWarnC  = ($cat.Group | Where-Object { $_.Severity -eq "WARNING"  }).Count
+            $catInfoC  = ($cat.Group | Where-Object { $_.Severity -eq "INFO"     }).Count
+            $catTotalC = $cat.Count
+
+            $catChartName = switch ($cat.Name) {
+                "Process"        { "Process &amp; Service Analysis" }
+                "Network"        { "Network Indicators" }
+                "Account"        { "Account &amp; Authentication" }
+                "FileSystem"     { "File System Red Flags" }
+                "DefenseEvasion" { "Defense Evasion &amp; Anti-Forensics" }
+                "Baseline"       { "Baseline Comparison" }
+                default          { $cat.Name }
+            }
+
+            $critPct = if ($maxCatCount -gt 0) { [math]::Round(($catCritC / $maxCatCount) * 100, 1) } else { 0 }
+            $warnPct = if ($maxCatCount -gt 0) { [math]::Round(($catWarnC / $maxCatCount) * 100, 1) } else { 0 }
+            $infoPct = if ($maxCatCount -gt 0) { [math]::Round(($catInfoC / $maxCatCount) * 100, 1) } else { 0 }
+
+            $critSeg = if ($catCritC -gt 0) { "<div class='chart-bar-segment' style='width:${critPct}%;background:var(--critical)'></div>" } else { "" }
+            $warnSeg = if ($catWarnC -gt 0) { "<div class='chart-bar-segment' style='width:${warnPct}%;background:var(--warning)'></div>" } else { "" }
+            $infoSeg = if ($catInfoC -gt 0) { "<div class='chart-bar-segment' style='width:${infoPct}%;background:var(--info)'></div>" } else { "" }
+
+            $chartRows += "<div class='chart-row'><span class='chart-label'>$catChartName</span><div class='chart-bar-bg'>$critSeg$warnSeg$infoSeg</div><span class='chart-count'>$catTotalC</span></div>"
+        }
+        $categoryChartHtml = "<div class='category-chart'>$chartRows</div>"
     }
 
     $html = @"
@@ -388,6 +425,14 @@ function Generate-HtmlReport {
         .stat-info .stat-value { color: var(--info); }
         .stat-total .stat-value { color: var(--text-primary); }
         .stat-suppressed .stat-value { color: var(--text-secondary); }
+
+        /* -- Category Chart -- */
+        .category-chart { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.5rem; margin-bottom: 1.5rem; max-height: 200px; overflow-y: auto; }
+        .chart-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.3rem 0; font-size: 0.8rem; }
+        .chart-label { flex: 0 0 200px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .chart-bar-bg { flex: 1; height: 14px; background: var(--bg-secondary); border-radius: 4px; display: flex; overflow: hidden; }
+        .chart-bar-segment { height: 100%; }
+        .chart-count { flex: 0 0 2rem; text-align: right; color: var(--text-muted); font-size: 0.75rem; }
 
         /* -- System Info -- */
         .system-info {
@@ -736,6 +781,8 @@ function Generate-HtmlReport {
             </div>
             $(if ($SuppressedCount -gt 0) { "<div class=`"stat-card stat-suppressed`"><div class=`"stat-value`">$SuppressedCount</div><div class=`"stat-label`">Suppressed</div></div>" })
         </div>
+
+        ${categoryChartHtml}
 
         <div class="system-info">
             <div><span class="label">Computer</span><span class="value">$($SystemInfo.ComputerName)</span></div>
