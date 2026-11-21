@@ -78,6 +78,7 @@ The report opens automatically in your browser. Findings are severity-colored (C
 Baselines enable **change detection** — the most powerful signal for catching compromises. New ports, services, accounts, autorun entries, scheduled tasks (including changed task actions), and Defender exclusions are flagged against your clean snapshot.
 
 > Baselines are only exported when you pass `-CreateBaseline`. A compromised scan cannot overwrite your clean baseline.
+> Anything with write access to the `reports` folder could still edit it, so keep the SHA-256 printed by `-CreateBaseline` (or a copy of the baseline) on removable or remote storage and pass it back with `-BaselineHash`. Scans also report an INFO when the baseline file was modified after it was created.
 
 </details>
 
@@ -115,7 +116,8 @@ Baselines enable **change detection** — the most powerful signal for catching 
 | `-ConfigPath` | Path to `config.json` (default: `.\config\config.json`) |
 | `-Offline` | Disable all external API calls |
 | `-BaselinePath` | Path to a specific baseline JSON |
-| `-CreateBaseline` | Snapshot current system state |
+| `-CreateBaseline` | Snapshot current system state (prints the baseline's SHA-256) |
+| `-BaselineHash` | SHA-256 printed by `-CreateBaseline`; the baseline is ignored with a WARNING if it no longer matches |
 | `-ExportJson` | Emit findings as JSON alongside HTML |
 | `-VerboseOutput` | Enable verbose console output (same as `-Verbose`) |
 | `-Redact` | Mask operator identity (computer name, username, paths) in all output |

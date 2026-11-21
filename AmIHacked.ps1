@@ -20,6 +20,9 @@
     Disable all API calls (VirusTotal, AbuseIPDB). Rely purely on local heuristics.
 .PARAMETER BaselinePath
     Path to a previous baseline JSON for diff comparison.
+.PARAMETER BaselineHash
+    SHA-256 of the baseline file, as printed by -CreateBaseline. If the baseline's hash differs,
+    it is not used and a WARNING is raised.
 .PARAMETER CreateBaseline
     Export a baseline snapshot of the current system state. Run this on a known-clean system first.
 .PARAMETER ExportJson
@@ -47,6 +50,7 @@ param(
     [string]$ConfigPath = "",
     [switch]$Offline,
     [string]$BaselinePath,
+    [string]$BaselineHash = "",
     [switch]$CreateBaseline,
     [switch]$ExportJson,
     [switch]$VerboseOutput,
@@ -189,10 +193,10 @@ $defaultBaselinePath = Join-Path (Join-Path $PSScriptRoot "reports") "baseline_l
 if ('Baseline' -notin $SkipModules) {
     if ($BaselinePath -and (Test-Path $BaselinePath)) {
         Write-Section "Baseline Comparison"
-        Compare-Baseline -BaselinePath $BaselinePath
+        Compare-Baseline -BaselinePath $BaselinePath -ExpectedHash $BaselineHash
     } elseif (-not $BaselinePath -and (Test-Path $defaultBaselinePath)) {
         Write-Section "Baseline Comparison"
-        Compare-Baseline -BaselinePath $defaultBaselinePath
+        Compare-Baseline -BaselinePath $defaultBaselinePath -ExpectedHash $BaselineHash
     } elseif (-not $CreateBaseline) {
         Add-Finding -Severity "INFO" -Category "General" -Title "No Baseline Found" `
             -Description "No baseline snapshot exists for comparison. Run with -CreateBaseline on a known-clean system to enable change detection on future scans." `

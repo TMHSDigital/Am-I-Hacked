@@ -872,6 +872,9 @@ function Export-Baseline {
 
         $baseline | ConvertTo-Json -Depth 5 | Set-Content $FilePath -Encoding UTF8
         Write-Status "Baseline snapshot saved to: $FilePath"
+        $baselineSha = (Get-FileHash -Path $FilePath -Algorithm SHA256).Hash
+        Write-Status "Baseline SHA-256: $baselineSha" -Color Green
+        Write-Status "Store this hash (or a copy of the baseline) off this machine, then pass -BaselineHash $baselineSha on later scans." -Color DarkGray
     } catch {
         Write-Status "Could not export baseline: $_" -Color Yellow
     }
@@ -884,10 +887,40 @@ function Get-TaskActionSignature {
 }
 
 function Compare-Baseline {
-    param([string]$BaselinePath)
+    param(
+        [string]$BaselinePath,
+        [string]$ExpectedHash = ""
+    )
 
     try {
+        # Integrity: anything with write access to the baseline could add its own items to the "known good" list
+        $actualHash = (Get-FileHash -Path $BaselinePath -Algorithm SHA256).Hash
+        if ($ExpectedHash -and $actualHash -ne $ExpectedHash.Trim().ToUpperInvariant()) {
+            Add-Finding -Severity "WARNING" -Category "Baseline" `
+                -Title "Baseline Hash Mismatch" `
+                -Description "The baseline file '$BaselinePath' has SHA-256 $actualHash, but -BaselineHash expected $($ExpectedHash.Trim().ToUpperInvariant()). The baseline was changed or replaced after it was created, so it was not used for comparison." `
+                -Remediation "Restore the baseline from an off-machine copy, or create a new one on a known-clean system with -CreateBaseline." `
+                -Details @{ Path = $BaselinePath; ExpectedHash = $ExpectedHash; ActualHash = $actualHash } `
+                -MITRE @("T1565.001")
+            return
+        }
+
         $old = Get-Content $BaselinePath -Raw | ConvertFrom-Json
+
+        try {
+            $created = if ($old.Timestamp -is [datetime]) { $old.Timestamp } else { [datetime]::Parse($old.Timestamp, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::RoundtripKind) }
+            $lastWrite = (Get-Item $BaselinePath).LastWriteTime
+            if ($lastWrite -gt $created.ToLocalTime().AddMinutes(5)) {
+                Add-Finding -Severity "INFO" -Category "Baseline" `
+                    -Title "Baseline Modified After Creation" `
+                    -Description "The baseline file '$BaselinePath' was last written on $lastWrite, after the snapshot it contains was taken ($($created.ToLocalTime())). If you did not edit or copy it, it may have been tampered with." `
+                    -Remediation "Verify the baseline with -BaselineHash, or recreate it on a known-clean system with -CreateBaseline." `
+                    -Details @{ Path = $BaselinePath; Created = $created; LastWriteTime = $lastWrite; Sha256 = $actualHash } `
+                    -MITRE @("T1565.001")
+            }
+        } catch {
+            Write-Verbose "Could not check baseline modification time: $_"
+        }
 
         $baselineAge = ""
         try {

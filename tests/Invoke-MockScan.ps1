@@ -321,6 +321,23 @@ try {
     $legacyOut = Compare-Baseline -BaselinePath $legacyBaseline *>&1 | Out-String
     Assert-True ($legacyOut -notmatch "Could not compare baseline" -and @($script:Findings | Where-Object { $_.Title -like "New Scheduled Task*" }).Count -eq 0) "Baseline without task/exclusion keys still loads"
     Remove-Item Function:\Get-ScheduledTask, Function:\Get-MpPreference
+
+    Write-TestHeader "Baseline Integrity"
+    $goodHash = (Get-FileHash $legacyBaseline -Algorithm SHA256).Hash
+    $script:Findings = [System.Collections.ArrayList]::new()
+    Compare-Baseline -BaselinePath $legacyBaseline -ExpectedHash $goodHash.ToLower() *> $null
+    Assert-True (@($script:Findings | Where-Object { $_.Title -like "Baseline Hash Mismatch*" }).Count -eq 0) "Matching -BaselineHash (any case) is accepted"
+    $script:Findings = [System.Collections.ArrayList]::new()
+    Compare-Baseline -BaselinePath $legacyBaseline -ExpectedHash ("0" * 64) *> $null
+    Assert-True (@($script:Findings | Where-Object { $_.Title -eq "Baseline Hash Mismatch" }).Count -eq 1 -and $script:Findings.Count -eq 1) "Mismatched -BaselineHash raises a WARNING and skips the comparison"
+    $staleBaseline = Join-Path $testTempDir "stale_baseline.json"
+    @{ Timestamp = (Get-Date).AddDays(-3).ToString("o"); ListeningPorts = @(); Services = @(); LocalAccounts = @(); RunKeys = @() } | ConvertTo-Json | Set-Content $staleBaseline -Encoding UTF8
+    $script:Findings = [System.Collections.ArrayList]::new()
+    Compare-Baseline -BaselinePath $staleBaseline *> $null
+    Assert-True (@($script:Findings | Where-Object { $_.Title -eq "Baseline Modified After Creation" }).Count -eq 1) "Baseline written after its embedded timestamp is reported"
+    $script:Findings = [System.Collections.ArrayList]::new()
+    Compare-Baseline -BaselinePath $legacyBaseline *> $null
+    Assert-True (@($script:Findings | Where-Object { $_.Title -eq "Baseline Modified After Creation" }).Count -eq 0) "Fresh baseline is not reported as modified"
     $script:Config = @{}
     $script:Findings = $null
 
