@@ -653,6 +653,12 @@ function Export-Baseline {
     }
 }
 
+function Get-TaskActionSignature {
+    <# One comparable string for a task's actions (Execute + Arguments of each action). #>
+    param($Actions)
+    return ((@($Actions) | Where-Object { $_ } | ForEach-Object { "$($_.Execute) $($_.Arguments)".Trim() }) -join " ; ")
+}
+
 function Compare-Baseline {
     param([string]$BaselinePath)
 
@@ -738,6 +744,60 @@ function Compare-Baseline {
                 }
             } catch {
                 Write-Verbose "Could not read Run key '$keyPath' for baseline comparison: $_"
+            }
+        }
+
+        # Scheduled tasks (baselines from before this check have no ScheduledTasks key)
+        if ($old.PSObject.Properties['ScheduledTasks']) {
+            $oldTasks = @{}
+            foreach ($t in @($old.ScheduledTasks)) {
+                if ($t) { $oldTasks["$($t.Path)$($t.Name)"] = Get-TaskActionSignature $t.Actions }
+            }
+            $currentTasks = @(Get-ScheduledTask -ErrorAction SilentlyContinue | Where-Object { $_.State -ne "Disabled" })
+            foreach ($task in $currentTasks) {
+                $taskKey = "$($task.TaskPath)$($task.TaskName)"
+                $signature = Get-TaskActionSignature $task.Actions
+                if (-not $oldTasks.ContainsKey($taskKey)) {
+                    Add-Finding -Severity "WARNING" -Category "Baseline" `
+                        -Title "New Scheduled Task: $taskKey" `
+                        -Description "Scheduled task '$taskKey' was not present in the baseline from $($old.Timestamp). Actions: '$signature'." `
+                        -Remediation "If unexpected, disable it: Disable-ScheduledTask -TaskName '$($task.TaskName)' -TaskPath '$($task.TaskPath)'" `
+                        -Details @{ TaskName = $task.TaskName; TaskPath = $task.TaskPath; Actions = $signature; BaselineDate = $old.Timestamp } `
+                        -MITRE @("T1053.005")
+                } elseif ($oldTasks[$taskKey] -ne $signature) {
+                    Add-Finding -Severity "WARNING" -Category "Baseline" `
+                        -Title "Scheduled Task Action Changed: $taskKey" `
+                        -Description "The actions of scheduled task '$taskKey' changed since the baseline from $($old.Timestamp). Before: '$($oldTasks[$taskKey])'. Now: '$signature'." `
+                        -Remediation "Verify the new action is legitimate. If not, disable the task: Disable-ScheduledTask -TaskName '$($task.TaskName)' -TaskPath '$($task.TaskPath)'" `
+                        -Details @{ TaskName = $task.TaskName; TaskPath = $task.TaskPath; OldActions = $oldTasks[$taskKey]; NewActions = $signature; BaselineDate = $old.Timestamp } `
+                        -MITRE @("T1053.005")
+                }
+            }
+        }
+
+        # Defender exclusions (skipped for older baselines without the key)
+        if ($old.PSObject.Properties['DefenderExclusions'] -and $old.DefenderExclusions) {
+            $prefs = $null
+            try { $prefs = Get-MpPreference -ErrorAction SilentlyContinue } catch { Write-Verbose "Get-MpPreference failed: $_" }
+            if ($prefs) {
+                $exclusionTypes = @(
+                    @{ Type = "Path";      Old = $old.DefenderExclusions.Paths;      Current = $prefs.ExclusionPath;      Param = "ExclusionPath" }
+                    @{ Type = "Process";   Old = $old.DefenderExclusions.Processes;  Current = $prefs.ExclusionProcess;   Param = "ExclusionProcess" }
+                    @{ Type = "Extension"; Old = $old.DefenderExclusions.Extensions; Current = $prefs.ExclusionExtension; Param = "ExclusionExtension" }
+                )
+                foreach ($et in $exclusionTypes) {
+                    $oldValues = @(Select-MpExclusion $et.Old)
+                    foreach ($value in @(Select-MpExclusion $et.Current)) {
+                        if ($value -notin $oldValues) {
+                            Add-Finding -Severity "WARNING" -Category "Baseline" `
+                                -Title "New Defender Exclusion ($($et.Type)): $value" `
+                                -Description "Defender exclusion '$value' ($($et.Type)) was not present in the baseline from $($old.Timestamp). Attackers add exclusions to hide malware from scanning." `
+                                -Remediation "If you didn't add it, remove it: Remove-MpPreference -$($et.Param) '$value'" `
+                                -Details @{ ExclusionType = $et.Type; Value = $value; BaselineDate = $old.Timestamp } `
+                                -MITRE @("T1562.001")
+                        }
+                    }
+                }
             }
         }
 

@@ -174,6 +174,31 @@ Invoke-AccountsChecks *> $null
 Assert-True (@($script:Findings | Where-Object { $_.Title -eq 'Hidden Account Detected: zzz-hidden$' }).Count -eq 1) "Account without PasswordLastSet does not stop enumeration (later hidden account reported)"
 Assert-True (@($script:Findings | Where-Object { $_.Title -eq 'No Password Set Date: aaa-test' }).Count -eq 1) "Enabled account without PasswordLastSet gets its own finding"
 Remove-Item Function:\Get-LocalUser, Function:\Get-WinEvent, Function:\Get-LocalGroupMember
+
+Write-TestHeader "Baseline Tasks and Exclusions"
+$mockBaseline = Join-Path $testTempDir "mock_baseline.json"
+@{
+    Timestamp = (Get-Date).ToString("o"); ListeningPorts = @(); Services = @(); LocalAccounts = @(); RunKeys = @()
+    ScheduledTasks = @(@{ Name = "MockTask"; Path = "\"; Actions = @(@{ Execute = "a.exe"; Arguments = "" }) })
+    DefenderExclusions = @{ Paths = @("C:\Known"); Processes = @(); Extensions = @() }
+} | ConvertTo-Json -Depth 5 | Set-Content $mockBaseline -Encoding UTF8
+function Get-ScheduledTask {
+    [PSCustomObject]@{ TaskName = "MockTask"; TaskPath = "\"; State = "Ready"; Actions = @([PSCustomObject]@{ Execute = "b.exe"; Arguments = "" }) }
+    [PSCustomObject]@{ TaskName = "NewTask"; TaskPath = "\"; State = "Ready"; Actions = @([PSCustomObject]@{ Execute = "c.exe"; Arguments = "-x" }) }
+}
+function Get-MpPreference { [PSCustomObject]@{ ExclusionPath = @("C:\Known", "C:\Evil"); ExclusionProcess = $null; ExclusionExtension = $null } }
+$script:Findings = [System.Collections.ArrayList]::new()
+Compare-Baseline -BaselinePath $mockBaseline *> $null
+Assert-True (@($script:Findings | Where-Object { $_.Title -eq "New Scheduled Task: \NewTask" }).Count -eq 1) "Task registered after the baseline is reported"
+Assert-True (@($script:Findings | Where-Object { $_.Title -eq "Scheduled Task Action Changed: \MockTask" }).Count -eq 1) "Changed task action is reported"
+Assert-True (@($script:Findings | Where-Object { $_.Title -eq "New Defender Exclusion (Path): C:\Evil" }).Count -eq 1 -and
+             @($script:Findings | Where-Object { $_.Title -like "New Defender Exclusion*Known" }).Count -eq 0) "New Defender exclusion is reported, baseline one is not"
+$legacyBaseline = Join-Path $testTempDir "legacy_baseline.json"
+@{ Timestamp = (Get-Date).ToString("o"); ListeningPorts = @(); Services = @(); LocalAccounts = @(); RunKeys = @() } | ConvertTo-Json | Set-Content $legacyBaseline -Encoding UTF8
+$script:Findings = [System.Collections.ArrayList]::new()
+$legacyOut = Compare-Baseline -BaselinePath $legacyBaseline *>&1 | Out-String
+Assert-True ($legacyOut -notmatch "Could not compare baseline" -and @($script:Findings | Where-Object { $_.Title -like "New Scheduled Task*" }).Count -eq 0) "Baseline without task/exclusion keys still loads"
+Remove-Item Function:\Get-ScheduledTask, Function:\Get-MpPreference
 $script:Config = @{}
 $script:Findings = $null
 
