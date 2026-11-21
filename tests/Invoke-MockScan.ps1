@@ -186,7 +186,8 @@ try {
     Assert-True ($candidatePaths -contains (Join-Path $testTempDir "MyDocs\PowerShell\Microsoft.PowerShell_profile.ps1") -and
                  $candidatePaths -contains (Join-Path $testTempDir "MyDocs\WindowsPowerShell\Microsoft.PowerShell_profile.ps1") -and
                  $candidatePaths -contains (Join-Path $env:ProgramFiles "PowerShell\7\profile.ps1")) "Profile scan covers both PowerShell editions regardless of host"
-    Assert-True ($candidatePaths -contains (Join-Path $fakeUsers "bob\Documents\PowerShell\profile.ps1") -and
+    # Suffix match: TEMP can be an 8.3 short path (C:\Users\RUNNER~1\...) while Get-ChildItem returns long names
+    Assert-True (@($candidatePaths | Where-Object { $_ -like "*\bob\Documents\PowerShell\profile.ps1" }).Count -gt 0 -and
                  @($candidates | Where-Object { $_.Owner -eq "bob" }).Count -gt 0 -and
                  @($candidates | Where-Object { $_.Owner -eq "Public" }).Count -eq 0) "Profile scan covers other users (as admin) and records the owner"
     $selfOnly = @(Get-PowerShellProfileCandidates -UsersRoot $fakeUsers -CurrentUserDocuments (Join-Path $testTempDir "MyDocs") -CurrentUserName "me")
@@ -424,6 +425,11 @@ try {
     # 3. Suspicious autorun entry (in a safe test-only location)
     Write-TestHeader "Suspicious Autorun Entry"
     $testRunKeyPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
+    if (-not (Test-Path $testRunKeyPath)) {
+        # Fresh profiles (e.g. CI runners) may not have the Run key yet; remove it again only if we created it
+        New-Item -Path $testRunKeyPath -Force | Out-Null
+        $script:CleanupActions.Add({ Remove-Item -Path $testRunKeyPath -ErrorAction SilentlyContinue }) | Out-Null
+    }
     $testRunKeyName = "AmIHackedTestEntry_$(Get-Random)"
     $testRunKeyValue = "powershell.exe -enc VGVzdA== -WindowStyle Hidden"
     try {
@@ -489,7 +495,7 @@ try {
         # Category coverage: each active module should produce at least one finding
         Write-TestHeader "Module Coverage"
         Assert-FindingCount -Findings $findings -Category "FileSystem"     -MinCount 1 -TestName "FileSystem module produced findings"
-        Assert-FindingCount -Findings $findings -Category "General"        -MinCount 1 -TestName "General module produced findings"
+        Assert-FindingCount -Findings $findings -Category "Account"        -MinCount 1 -TestName "Accounts module produced findings"
         Assert-FindingCount -Findings $findings -Category "Network"        -MinCount 1 -TestName "Network module produced findings"
         Assert-FindingCount -Findings $findings -Category "DefenseEvasion" -MinCount 1 -TestName "DefenseEvasion module produced findings"
 
