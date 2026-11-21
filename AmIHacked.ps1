@@ -25,7 +25,7 @@
 .PARAMETER ExportJson
     Emit findings as a JSON file alongside the HTML report.
 .PARAMETER VerboseOutput
-    Enable verbose console output during scan
+    Enable verbose console output during scan (same as the common -Verbose switch).
 .PARAMETER Redact
     Mask the operator's identity (computer name, username, domain, profile path) in console output,
     HTML reports, and JSON exports. Useful for screenshots or sharing reports publicly.
@@ -65,12 +65,16 @@ if (-not $ConfigPath) { $ConfigPath = Join-Path $PSScriptRoot "config\config.jso
 # ── Bootstrap ────────────────────────────────────────────────────────────────
 
 $ErrorActionPreference = "Continue"
+if ($VerboseOutput) { $VerbosePreference = "Continue" }
 $script:StartTime = Get-Date
 $script:Findings = [System.Collections.ArrayList]::new()
 $script:SystemInfo = @{}
 $script:Config = @{}
 $script:OfflineMode = $Offline.IsPresent
-$script:NonInteractive = $CIMode.IsPresent -or
+# CI behaviour also applies when the host was started with -NonInteractive (accepted abbreviation: -noni)
+# or has no window station (services, some scheduled tasks), where UserInteractive is false.
+$hostNonInteractive = @([Environment]::GetCommandLineArgs() | Where-Object { $_ -match '^-noni' }).Count -gt 0
+$script:NonInteractive = $CIMode.IsPresent -or $hostNonInteractive -or
                           -not [Environment]::UserInteractive
 if ($script:NonInteractive) {
     $script:RedactMode = $true

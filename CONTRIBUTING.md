@@ -21,7 +21,7 @@ Author: Your Name
 #>
 ```
 
-The `Description` field is displayed in the console and report. `Name` must match the `{Name}` portion of your filename (`Check-{Name}.ps1`).
+The `Description` field is displayed in the console and report. The module name used by the orchestrator (for `-SkipModules` and the `Invoke-{Name}Checks` function) comes from the filename (`Check-{Name}.ps1`), not from the `Name` field, so keep `Name` the same as the `{Name}` part of the filename to avoid confusion.
 
 ### 3. Implement the function
 

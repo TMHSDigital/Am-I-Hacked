@@ -539,6 +539,14 @@ try {
             $script:TestsFailed++
         }
 
+        Write-TestHeader "NonInteractive Host"
+        $hostExe = (Get-Process -Id $PID).Path
+        $niOutputDir = Join-Path $testTempDir "reports_noni"
+        New-Item -ItemType Directory -Path $niOutputDir -Force | Out-Null
+        $niOutput = & $hostExe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$repoRoot\AmIHacked.ps1" -OutputPath $niOutputDir -Offline `
+            -SkipModules Processes,Network,Accounts,FileSystem,DefenseEvasion,Baseline 2>&1 | Out-String
+        Assert-True ($niOutput -match "---AMIHACKED-SUMMARY-JSON---") "Host started with -NonInteractive auto-enables CI mode"
+
         Write-TestHeader "CIMode Exit Code"
         if ($ciExit -ge 0 -and $ciExit -le 2) {
             Write-Host "  [PASS] CIMode exit code is $ciExit (0=clean, 1=warning, 2=critical)" -ForegroundColor Green

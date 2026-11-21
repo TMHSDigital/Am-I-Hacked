@@ -84,7 +84,7 @@ Copied from `config/config.example.json`. Controls:
 
 ### Baseline System
 
-`-CreateBaseline` snapshots ports, services, accounts, Run keys, scheduled tasks, and Defender exclusions to JSON. Baselines are **never auto-overwritten** — this is intentional to prevent a compromised system from poisoning its own baseline. Baseline comparison can be skipped with `-SkipModules Baseline`. Ephemeral ports (49152-65535) are excluded from baseline diffs.
+`-CreateBaseline` snapshots ports, services, accounts, Run keys, scheduled tasks, and Defender exclusions to JSON; `Compare-Baseline` flags new items in each (and changed scheduled task actions). Baselines are **never auto-overwritten** — this is intentional to prevent a compromised system from poisoning its own baseline. Baseline comparison can be skipped with `-SkipModules Baseline`. Ephemeral ports (49152-65535) are excluded from baseline diffs.
 
 ### Redaction System
 
@@ -108,7 +108,7 @@ Individual modules do not need to handle redaction.
 - Prints a JSON summary to stdout after all output, delimited by `---AMIHACKED-SUMMARY-JSON---`
 - Exits with structured code: 0 = clean, 1 = warnings, 2 = critical
 
-Non-interactive environments auto-enable these behaviors via `[Environment]::UserInteractive`.
+Non-interactive environments auto-enable these behaviors: a host started with `-NonInteractive` (detected from the command line) or a session where `[Environment]::UserInteractive` is false.
 
 Recommended invocation from an AI agent:
 

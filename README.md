@@ -75,7 +75,7 @@ The report opens automatically in your browser. Findings are severity-colored (C
 .\AmIHacked.ps1
 ```
 
-Baselines enable **change detection** — the most powerful signal for catching compromises. New ports, services, accounts, autorun entries, and scheduled tasks are flagged against your clean snapshot.
+Baselines enable **change detection** — the most powerful signal for catching compromises. New ports, services, accounts, autorun entries, scheduled tasks (including changed task actions), and Defender exclusions are flagged against your clean snapshot.
 
 > Baselines are only exported when you pass `-CreateBaseline`. A compromised scan cannot overwrite your clean baseline.
 
@@ -117,7 +117,7 @@ Baselines enable **change detection** — the most powerful signal for catching 
 | `-BaselinePath` | Path to a specific baseline JSON |
 | `-CreateBaseline` | Snapshot current system state |
 | `-ExportJson` | Emit findings as JSON alongside HTML |
-| `-VerboseOutput` | Enable verbose console output |
+| `-VerboseOutput` | Enable verbose console output (same as `-Verbose`) |
 | `-Redact` | Mask operator identity (computer name, username, paths) in all output |
 | `-CIMode` | Agent/CI-friendly output: suppress banner + browser, auto-redact, JSON summary on stdout, structured exit code |
 
@@ -145,7 +145,7 @@ Baselines enable **change detection** — the most powerful signal for catching 
 
 - Exit code reflects findings: **0** = clean, **1** = warnings only, **2** = critical findings detected
 
-Non-interactive environments (e.g. piped through `powershell.exe -NonInteractive`) auto-enable CI mode behaviors.
+Sessions started with `powershell.exe -NonInteractive` (or `pwsh -NonInteractive`), and sessions without an interactive desktop such as services, auto-enable CI mode behaviors.
 
 ---
 
@@ -267,11 +267,11 @@ Every finding is tagged with technique IDs from the [MITRE ATT&CK](https://attac
 | Tactic | Techniques |
 |--------|-----------|
 | **Execution** | T1059.001, T1204.002 |
-| **Persistence** | T1053.005, T1136.001, T1197, T1543.003, T1546.003, T1546.010, T1546.012, T1546.015, T1547.001, T1547.004 |
-| **Privilege Escalation** | T1574.001, T1574.009 |
-| **Defense Evasion** | T1036.001, T1036.005, T1070.001, T1546.013, T1553.004, T1562.001, T1562.002, T1562.004, T1564, T1564.002, T1564.004 |
+| **Initial Access** | T1078.003 |
+| **Persistence** | T1053.005, T1078.003, T1136.001, T1197, T1543.003, T1546.003, T1546.010, T1546.012, T1546.015, T1547.001, T1547.004 |
+| **Privilege Escalation** | T1078.003, T1574.001, T1574.009 |
+| **Defense Evasion** | T1036.001, T1036.005, T1070.001, T1078.003, T1546.013, T1553.004, T1562.001, T1562.002, T1562.004, T1564, T1564.002, T1564.004 |
 | **Credential Access** | T1003.001, T1003.002, T1003.003, T1110, T1110.001, T1555, T1555.003 |
-| **Discovery** | T1078.003 |
 | **Lateral Movement** | T1021.001 |
 | **Collection** | T1005, T1560.001 |
 | **Command & Control** | T1071.001, T1090, T1571 |
@@ -348,7 +348,7 @@ This tool is for **defensive security assessment only**. It identifies potential
 
 <div align="center">
 
-**[Report Bug](https://github.com/TMHSDigital/Am-I-Hacked/issues/new?template=bug_report.md)** · **[Request Feature](https://github.com/TMHSDigital/Am-I-Hacked/issues/new?template=feature_request.md)** · **[Contributing](CONTRIBUTING.md)**
+**[Report Bug](https://github.com/TMHSDigital/Am-I-Hacked/issues/new?template=bug_report.md)** · **[Request Detection](https://github.com/TMHSDigital/Am-I-Hacked/issues/new?template=detection_request.md)** · **[Contributing](CONTRIBUTING.md)**
 
 MIT License — [TM Hospitality Strategies](https://github.com/TMHSDigital)
 
