@@ -177,6 +177,21 @@ try {
     $decodedProxy = ConvertFrom-WinHttpSettings $proxyBlob
     Assert-True (-not (ConvertFrom-WinHttpSettings $directBlob).UsesProxy -and $decodedProxy.UsesProxy -and $decodedProxy.Proxy -eq "10.0.0.5:8080" -and $decodedProxy.Bypass -eq "<local>") "WinHTTP proxy settings decode (direct vs named proxy)"
 
+    Write-TestHeader "PowerShell Profile Candidates"
+    $fakeUsers = Join-Path $testTempDir "Users"
+    New-Item -ItemType Directory -Path (Join-Path $fakeUsers "bob\Documents\PowerShell") -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $fakeUsers "Public") -Force | Out-Null
+    $candidates = @(Get-PowerShellProfileCandidates -AllUsers -UsersRoot $fakeUsers -CurrentUserDocuments (Join-Path $testTempDir "MyDocs") -CurrentUserName "me")
+    $candidatePaths = @($candidates | ForEach-Object { $_.Path })
+    Assert-True ($candidatePaths -contains (Join-Path $testTempDir "MyDocs\PowerShell\Microsoft.PowerShell_profile.ps1") -and
+                 $candidatePaths -contains (Join-Path $testTempDir "MyDocs\WindowsPowerShell\Microsoft.PowerShell_profile.ps1") -and
+                 $candidatePaths -contains (Join-Path $env:ProgramFiles "PowerShell\7\profile.ps1")) "Profile scan covers both PowerShell editions regardless of host"
+    Assert-True ($candidatePaths -contains (Join-Path $fakeUsers "bob\Documents\PowerShell\profile.ps1") -and
+                 @($candidates | Where-Object { $_.Owner -eq "bob" }).Count -gt 0 -and
+                 @($candidates | Where-Object { $_.Owner -eq "Public" }).Count -eq 0) "Profile scan covers other users (as admin) and records the owner"
+    $selfOnly = @(Get-PowerShellProfileCandidates -UsersRoot $fakeUsers -CurrentUserDocuments (Join-Path $testTempDir "MyDocs") -CurrentUserName "me")
+    Assert-True (@($selfOnly | Where-Object { $_.Owner -eq "bob" }).Count -eq 0) "Without admin, other users' profiles are not scanned"
+
     Write-TestHeader "Hosts File Security Entries"
     $adBlock = @("0.0.0.0 googleads.g.doubleclick.net", "0.0.0.0 google-analytics.com", "0.0.0.0 avgthing.example.com", "0.0.0.0 example.com # virustotal", "0.0.0.0 vortex.data.microsoft.com")
     Assert-True (@(Get-HostsSecurityEntry -Lines $adBlock).Count -eq 0) "Ad-block and telemetry hosts lines are not security entries"

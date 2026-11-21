@@ -494,6 +494,60 @@ function ConvertFrom-LogClearedXml {
     return [PSCustomObject]@{ Channel = $data.Channel; Account = $account }
 }
 
+function Get-PowerShellProfileCandidates {
+    <#
+        Every PowerShell profile file that can run at startup, independent of the host running the scan:
+        all-users profiles of Windows PowerShell 5.1 and PowerShell 7, and per-user profiles
+        (WindowsPowerShell and PowerShell folders x console/ISE/VS Code/all-hosts) for the current
+        user, plus every other user under the Users folder when -AllUsers is set (needs admin).
+        Returns objects with Name, Path and Owner; paths are not checked for existence.
+    #>
+    param(
+        [switch]$AllUsers,
+        [string]$UsersRoot = (Split-Path $env:USERPROFILE -Parent),
+        [string]$CurrentUserDocuments = [Environment]::GetFolderPath('MyDocuments'),
+        [string]$CurrentUserName = $env:USERNAME
+    )
+    $list = [System.Collections.ArrayList]::new()
+    $seen = @{}
+    $add = {
+        param($Name, $Path, $Owner)
+        if (-not $Path) { return }
+        $k = $Path.ToLowerInvariant()
+        if ($seen.ContainsKey($k)) { return }
+        $seen[$k] = $true
+        $list.Add([PSCustomObject]@{ Name = $Name; Path = $Path; Owner = $Owner }) | Out-Null
+    }
+
+    $allUserHomes = @(
+        @{ Edition = "Windows PowerShell"; Dir = (Join-Path $env:windir "System32\WindowsPowerShell\v1.0") }
+        @{ Edition = "PowerShell 7"; Dir = (Join-Path $env:ProgramFiles "PowerShell\7") }
+    )
+    foreach ($h in $allUserHomes) {
+        foreach ($f in @("profile.ps1", "Microsoft.PowerShell_profile.ps1", "Microsoft.PowerShellISE_profile.ps1", "Microsoft.VSCode_profile.ps1")) {
+            & $add "All users ($($h.Edition), $f)" (Join-Path $h.Dir $f) "All users"
+        }
+    }
+
+    $userDocs = [System.Collections.ArrayList]::new()
+    if ($CurrentUserDocuments) { $userDocs.Add(@{ Owner = $CurrentUserName; Docs = $CurrentUserDocuments }) | Out-Null }
+    if ($AllUsers -and $UsersRoot -and (Test-Path $UsersRoot)) {
+        foreach ($u in Get-ChildItem $UsersRoot -Directory -ErrorAction SilentlyContinue) {
+            if ($u.Name -in @("Public", "Default", "Default User", "All Users")) { continue }
+            $userDocs.Add(@{ Owner = $u.Name; Docs = (Join-Path $u.FullName "Documents") }) | Out-Null
+            $userDocs.Add(@{ Owner = $u.Name; Docs = (Join-Path $u.FullName "OneDrive\Documents") }) | Out-Null
+        }
+    }
+    foreach ($ud in $userDocs) {
+        foreach ($edition in @(@{ Label = "Windows PowerShell"; Folder = "WindowsPowerShell" }, @{ Label = "PowerShell 7"; Folder = "PowerShell" })) {
+            foreach ($f in @("profile.ps1", "Microsoft.PowerShell_profile.ps1", "Microsoft.PowerShellISE_profile.ps1", "Microsoft.VSCode_profile.ps1")) {
+                & $add "$($ud.Owner) ($($edition.Label), $f)" (Join-Path $ud.Docs (Join-Path $edition.Folder $f)) $ud.Owner
+            }
+        }
+    }
+    return $list.ToArray()
+}
+
 function Get-PacUrlSeverity {
     <#
         Severity for a proxy auto-config (PAC) URL: CRITICAL for local files, raw-IP hosts or

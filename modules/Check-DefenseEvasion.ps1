@@ -270,12 +270,14 @@ function Invoke-DefenseEvasionChecks {
     Write-Status "Checking PowerShell profiles for injection..."
 
     try {
-        $profilePaths = @(
-            @{ Name = "AllUsersAllHosts";       Path = $PROFILE.AllUsersAllHosts },
-            @{ Name = "AllUsersCurrentHost";    Path = $PROFILE.AllUsersCurrentHost },
-            @{ Name = "CurrentUserAllHosts";    Path = $PROFILE.CurrentUserAllHosts },
-            @{ Name = "CurrentUserCurrentHost"; Path = $PROFILE.CurrentUserCurrentHost }
-        )
+        # Profiles of both PowerShell editions and all hosts, not only those of the host running the scan;
+        # other users' profiles are included when running as admin.
+        $profilePaths = @(Get-PowerShellProfileCandidates -AllUsers:$script:IsAdmin)
+        foreach ($hostProfile in @($PROFILE.AllUsersAllHosts, $PROFILE.AllUsersCurrentHost, $PROFILE.CurrentUserAllHosts, $PROFILE.CurrentUserCurrentHost)) {
+            if ($hostProfile -and -not ($profilePaths | Where-Object { $_.Path -eq $hostProfile })) {
+                $profilePaths += [PSCustomObject]@{ Name = "$env:USERNAME ($(Split-Path $hostProfile -Leaf))"; Path = $hostProfile; Owner = $env:USERNAME }
+            }
+        }
 
         $suspiciousPatterns = @(
             'Download',
@@ -308,11 +310,12 @@ function Invoke-DefenseEvasionChecks {
                 $fileInfo = Get-Item $profile.Path -ErrorAction SilentlyContinue
                 Add-Finding -Severity "WARNING" -Category "DefenseEvasion" `
                     -Title "Suspicious PowerShell Profile: $($profile.Name)" `
-                    -Description "The PowerShell profile '$($profile.Name)' at '$($profile.Path)' contains suspicious patterns. Attackers inject code into PS profiles to execute malicious commands on every PowerShell session. Matched patterns: $($matched -join ', ')." `
+                    -Description "The PowerShell profile '$($profile.Name)' (owner: $($profile.Owner)) at '$($profile.Path)' contains suspicious patterns. Attackers inject code into PS profiles to execute malicious commands on every PowerShell session. Matched patterns: $($matched -join ', ')." `
                     -Remediation "Review the profile content: Get-Content '$($profile.Path)'. Remove suspicious lines or rename the file." `
                     -Details @{
                         Path            = $profile.Path
                         ProfileName     = $profile.Name
+                        Owner           = $profile.Owner
                         FileSize        = if ($fileInfo) { $fileInfo.Length } else { 0 }
                         LastModified    = if ($fileInfo) { $fileInfo.LastWriteTime } else { $null }
                         MatchedPatterns = $matched
