@@ -96,6 +96,8 @@ try {
         -OutputFile $unitReport -Duration ([timespan]::FromSeconds(1)) -Version "test" | Out-Null
     $unitHtml = Get-Content $unitReport -Raw
     Assert-True ($unitHtml -match 'data-verdict="COMPROMISED" data-critical="1"') "Single CRITICAL finding yields COMPROMISED verdict and count 1" "report verdict banner: $([regex]::Match($unitHtml, 'data-verdict="[^"]*" data-critical="[^"]*"').Value)"
+    $externalLoads = [regex]::Matches($unitHtml, '(@import|src=|<link)[^>]*https?://') | ForEach-Object { $_.Value }
+    Assert-True (@($externalLoads).Count -eq 0 -and $unitHtml -match "Content-Security-Policy") "Report loads no external resources and sets a CSP" (@($externalLoads) -join ", ")
 
     Write-TestHeader "IP Helpers"
     Assert-True ((Test-IPInCIDR "8.8.8.8" "0.0.0.0/0") -and (Test-IPInCIDR "20.1.2.3" "20.0.0.0/8") -and -not (Test-IPInCIDR "21.1.2.3" "20.0.0.0/8")) "Test-IPInCIDR handles /0 and /8"

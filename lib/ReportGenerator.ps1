@@ -178,9 +178,9 @@ function Generate-HtmlReport {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:">
     <title>Am I Hacked? -- Security Report</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700;800;900&display=swap');
 
         :root {
             --bg-primary: #0d0f14;
@@ -209,7 +209,7 @@ function Generate-HtmlReport {
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: 'Inter', -apple-system, sans-serif;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
             background: var(--bg-primary);
             color: var(--text-primary);
             line-height: 1.65;
@@ -267,7 +267,7 @@ function Generate-HtmlReport {
         }
 
         .report-header h1 {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
             font-size: 2.4rem;
             font-weight: 900;
             letter-spacing: 0.12em;
@@ -279,7 +279,7 @@ function Generate-HtmlReport {
         .report-header .subtitle {
             font-size: 0.85rem;
             color: var(--text-muted);
-            font-family: 'JetBrains Mono', monospace;
+            font-family: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
             letter-spacing: 0.02em;
         }
 
@@ -291,7 +291,7 @@ function Generate-HtmlReport {
         }
 
         .header-btn {
-            font-family: 'JetBrains Mono', monospace;
+            font-family: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
             font-size: 0.7rem;
             padding: 0.4rem 0.85rem;
             border-radius: 4px;
@@ -342,7 +342,7 @@ function Generate-HtmlReport {
         .verdict-icon.icon-critical { background: var(--critical); }
 
         .verdict-label {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
             font-size: 1.6rem;
             font-weight: 800;
             color: ${verdictColor};
@@ -366,7 +366,7 @@ function Generate-HtmlReport {
         .score-ring-fill { fill: none; stroke-width: 7; stroke-linecap: round; transition: stroke-dashoffset 1.5s ease-out; }
         .score-value {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            font-family: 'JetBrains Mono', monospace; font-size: 1.75rem; font-weight: 700;
+            font-family: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace; font-size: 1.75rem; font-weight: 700;
         }
         .score-label {
             font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;
@@ -392,7 +392,7 @@ function Generate-HtmlReport {
         .stat-card:hover { border-color: var(--accent); }
 
         .stat-value {
-            font-family: 'JetBrains Mono', monospace;
+            font-family: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
             font-size: 2rem;
             font-weight: 700;
             line-height: 1;
@@ -436,7 +436,7 @@ function Generate-HtmlReport {
 
         .system-info div { display: flex; flex-direction: column; gap: 0.15rem; }
         .system-info .label { color: var(--text-muted); font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
-        .system-info .value { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--text-primary); }
+        .system-info .value { font-family: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace; font-size: 0.8rem; color: var(--text-primary); }
 
         /* -- Filter Controls -- */
         .filter-bar {
@@ -447,7 +447,7 @@ function Generate-HtmlReport {
         }
 
         .filter-btn {
-            font-family: 'JetBrains Mono', monospace;
+            font-family: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
             font-size: 0.72rem;
             padding: 0.45rem 1rem;
             border-radius: 5px;
@@ -487,7 +487,7 @@ function Generate-HtmlReport {
         .category-badges { display: flex; gap: 0.5rem; }
 
         .badge {
-            font-family: 'JetBrains Mono', monospace;
+            font-family: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
             font-size: 0.65rem;
             font-weight: 600;
             padding: 0.2rem 0.55rem;
@@ -547,7 +547,7 @@ function Generate-HtmlReport {
         .sev-info { background: var(--info); }
 
         .finding-severity {
-            font-family: 'JetBrains Mono', monospace;
+            font-family: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
             font-size: 0.7rem;
             font-weight: 700;
             white-space: nowrap;
@@ -568,7 +568,7 @@ function Generate-HtmlReport {
         .mitre-tags { display: inline-flex; gap: 0.35rem; margin-left: auto; flex-wrap: wrap; }
 
         .mitre-badge {
-            font-family: 'JetBrains Mono', monospace;
+            font-family: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
             font-size: 0.58rem;
             font-weight: 600;
             padding: 0.12rem 0.45rem;
@@ -607,7 +607,7 @@ function Generate-HtmlReport {
         }
 
         .ps-cmd {
-            font-family: 'JetBrains Mono', monospace;
+            font-family: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
             font-size: 0.72rem;
             background: rgba(0,0,0,0.35);
             border: 1px solid var(--border);
@@ -624,7 +624,7 @@ function Generate-HtmlReport {
 
         /* -- Details -- */
         .details-toggle {
-            font-family: 'JetBrains Mono', monospace;
+            font-family: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
             font-size: 0.68rem;
             background: rgba(255,255,255,0.03);
             border: 1px solid var(--border);
@@ -638,7 +638,7 @@ function Generate-HtmlReport {
         .details-toggle:hover { background: rgba(255,255,255,0.06); color: var(--text-secondary); }
 
         .details-content {
-            font-family: 'JetBrains Mono', monospace;
+            font-family: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
             font-size: 0.68rem;
             background: var(--bg-primary);
             border: 1px solid var(--border);
@@ -672,7 +672,7 @@ function Generate-HtmlReport {
             background: var(--bg-card);
             border: 1px solid var(--green);
             color: var(--green);
-            font-family: 'JetBrains Mono', monospace;
+            font-family: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
             font-size: 0.72rem;
             padding: 0.5rem 1rem;
             border-radius: 6px;
