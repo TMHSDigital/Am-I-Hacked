@@ -628,26 +628,27 @@ function Invoke-FileSystemChecks {
 
     foreach ($ns in $wmiNamespaces) {
         try {
-            $wmiBindings = Get-WmiObject -Namespace $ns -Class __FilterToConsumerBinding -ErrorAction SilentlyContinue
+            $wmiBindings = @(Get-WmiObject -Namespace $ns -Class __FilterToConsumerBinding -ErrorAction SilentlyContinue)
             $wmiCmdConsumers = Get-WmiObject -Namespace $ns -Class CommandLineEventConsumer -ErrorAction SilentlyContinue
             $wmiScriptConsumers = Get-WmiObject -Namespace $ns -Class ActiveScriptEventConsumer -ErrorAction SilentlyContinue
 
             $nsLabel = if ($ns -eq "root\subscription") { "" } else { " [NON-STANDARD: $ns]" }
             $nsSeverity = if ($ns -eq "root\subscription") { "CRITICAL" } else { "CRITICAL" }
 
-            if ($wmiBindings -and $wmiBindings.Count -gt 0) {
-                foreach ($binding in $wmiBindings) {
-                    Add-Finding -Severity $nsSeverity -Category "FileSystem" `
-                        -Title "WMI Persistence Binding Found$nsLabel" `
-                        -Description "WMI event subscription binding detected in '$ns': Filter='$($binding.Filter)' Consumer='$($binding.Consumer)'. WMI persistence survives reboots and is nearly invisible to standard tools — heavily used by advanced threats." `
-                        -Remediation "Get-WmiObject -Namespace '$ns' -Class __FilterToConsumerBinding | Remove-WmiObject" `
-                        -Details @{
-                            Namespace = $ns
-                            Filter = $binding.Filter
-                            Consumer = $binding.Consumer
-                        } `
-                        -MITRE @("T1546.003")
-                }
+            foreach ($binding in $wmiBindings) {
+                if (Test-IsDefaultWmiBinding -Filter $binding.Filter -Consumer $binding.Consumer) { continue }
+                $filterLit = ([string]$binding.Filter) -replace "'", "''"
+                $consumerLit = ([string]$binding.Consumer) -replace "'", "''"
+                Add-Finding -Severity $nsSeverity -Category "FileSystem" `
+                    -Title "WMI Persistence Binding Found$nsLabel" `
+                    -Description "WMI event subscription binding detected in '$ns': Filter='$($binding.Filter)' Consumer='$($binding.Consumer)'. WMI persistence survives reboots and is nearly invisible to standard tools — heavily used by advanced threats." `
+                    -Remediation "Get-WmiObject -Namespace '$ns' -Class __FilterToConsumerBinding | Where-Object { `$_.Filter -eq '$filterLit' -and `$_.Consumer -eq '$consumerLit' } | Remove-WmiObject" `
+                    -Details @{
+                        Namespace = $ns
+                        Filter = $binding.Filter
+                        Consumer = $binding.Consumer
+                    } `
+                    -MITRE @("T1546.003")
             }
 
             if ($wmiCmdConsumers) {

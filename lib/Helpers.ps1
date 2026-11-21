@@ -420,6 +420,13 @@ function Get-FileSignature {
     return [PSCustomObject]@{ Status = "CheckFailed"; StatusMessage = "Signature check unavailable (PS.Security module could not be loaded)." }
 }
 
+function Test-IsDefaultWmiBinding {
+    <# True for the binding Windows ships by default (SCM Event Log Filter -> NTEventLogEventConsumer "SCM Event Log Consumer"). #>
+    param([string]$Filter, [string]$Consumer)
+    return ($Filter -match '(^|:)__EventFilter\.Name="SCM Event Log Filter"$' -and
+            $Consumer -match '(^|:)NTEventLogEventConsumer\.Name="SCM Event Log Consumer"$')
+}
+
 function Test-SignatureUnknown {
     <# True when the signature could not be checked (CheckFailed sentinel). Callers must treat this as unknown, never as unsigned. #>
     param($Signature)

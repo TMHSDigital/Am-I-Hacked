@@ -102,6 +102,10 @@ Assert-True (-not (Test-IsUncommonRemotePort 443) -and -not (Test-IsUncommonRemo
 Assert-True (Test-IsUncommonRemotePort 23) "Outbound port 23 is an uncommon port"
 $script:Config = @{}
 
+Write-TestHeader "WMI Default Binding Allowlist"
+Assert-True (Test-IsDefaultWmiBinding '__EventFilter.Name="SCM Event Log Filter"' 'NTEventLogEventConsumer.Name="SCM Event Log Consumer"') "Default SCM Event Log binding is allowlisted"
+Assert-True (-not (Test-IsDefaultWmiBinding '__EventFilter.Name="Updater"' 'CommandLineEventConsumer.Name="Updater"')) "Non-default WMI binding is not allowlisted"
+
 Write-TestHeader "Degraded Signature Checks"
 # Simulate Get-AuthenticodeSignature being unavailable: every signature comes back as CheckFailed.
 . "$repoRoot\modules\Check-Processes.ps1"
