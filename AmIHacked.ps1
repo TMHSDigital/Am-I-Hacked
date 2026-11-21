@@ -13,6 +13,10 @@
     Directory for the HTML report. Defaults to .\reports
 .PARAMETER SkipModules
     Array of module names to skip (e.g., 'Network','FileSystem')
+.PARAMETER Modules
+    Run only these modules (Baseline comparison still runs unless skipped). Use -ListModules to see names.
+.PARAMETER ListModules
+    List the available modules with their descriptions and exit.
 .PARAMETER ConfigPath
     Path to config.json for whitelists and API keys. Defaults to .\config\config.json
     Copy config\config.example.json to config\config.json to customize.
@@ -47,6 +51,8 @@
 param(
     [string]$OutputPath = "",
     [string[]]$SkipModules = @(),
+    [string[]]$Modules = @(),
+    [switch]$ListModules,
     [string]$ConfigPath = "",
     [switch]$Offline,
     [string]$BaselinePath,
@@ -93,6 +99,24 @@ $script:Version = "0.5.0"
 # ── Helpers (loaded first) ───────────────────────────────────────────────────
 
 . (Join-Path $PSScriptRoot "lib\Helpers.ps1")
+
+# ── Module Discovery & Selection ─────────────────────────────────────────────
+
+$modulesDir = Join-Path $PSScriptRoot "modules"
+# Not "$modules": variable names are case-insensitive and $Modules is a [string[]] parameter
+$discoveredModules = @(Get-ScanModules -ModulesDir $modulesDir)
+
+if ($ListModules) {
+    foreach ($m in $discoveredModules) { Write-Output ("{0,-16} {1}" -f $m.Name, $m.Description) }
+    Write-Output ("{0,-16} {1}" -f "Baseline", "Baseline comparison (skip with -SkipModules Baseline)")
+    exit 0
+}
+
+$moduleSelection = Resolve-ModuleSelection -Available @($discoveredModules | ForEach-Object { $_.Name }) -Modules $Modules -SkipModules $SkipModules
+if ($moduleSelection.Unknown.Count -gt 0) {
+    Write-Warning "Unknown module name(s): $($moduleSelection.Unknown -join ', '). Valid names: $($moduleSelection.Valid -join ', ')."
+}
+$SkipModules = $moduleSelection.Skip
 
 # ── Redact Map ───────────────────────────────────────────────────────────────
 
@@ -220,38 +244,16 @@ if (-not $script:SignatureCheckAvailable) {
         -Remediation "Run the scan in a fresh PowerShell session. If the issue persists, run 'sfc /scannow' to repair PowerShell modules."
 }
 
-# ── Dynamic Module Discovery ─────────────────────────────────────────────────
-
-$modulesDir = Join-Path $PSScriptRoot "modules"
-$modules = @()
-
-if (Test-Path $modulesDir) {
-    $modules = Get-ChildItem $modulesDir -Filter "Check-*.ps1" | ForEach-Object {
-        $name = $_.BaseName -replace '^Check-', ''
-        $description = "$name Analysis"
-
-        $content = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
-        if ($content -match '(?s)<#\s*MODULE\s*\r?\n(.*?)#>') {
-            $metaBlock = $Matches[1]
-            if ($metaBlock -match 'Description:\s*(.+)') {
-                $description = $Matches[1].Trim()
-            }
-        }
-
-        @{ Name = $name; File = $_.Name; Description = $description; FullPath = $_.FullName }
-    }
-}
-
 # ── Run Modules ──────────────────────────────────────────────────────────────
 
-$runnableModules = @($modules | Where-Object { $SkipModules -notcontains $_.Name })
+$runnableModules = @($discoveredModules | Where-Object { $SkipModules -notcontains $_.Name })
 $script:ModuleTotal = $runnableModules.Count + 1
 $script:ModuleIndex = 0
 
 $moduleNames = ($runnableModules | ForEach-Object { $_.Name }) -join ", "
 Write-Status "Scanning $($runnableModules.Count) modules: $moduleNames"
 
-foreach ($mod in $modules) {
+foreach ($mod in $discoveredModules) {
     if ($SkipModules -contains $mod.Name) {
         Write-Status "SKIPPING: $($mod.Description)" -Color DarkGray
         continue

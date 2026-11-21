@@ -214,6 +214,18 @@ try {
                  -not (Test-UnquotedServicePath '"C:\Program Files\Vendor\svc.exe" -x') -and
                  -not (Test-UnquotedServicePath 'C:\Windows\System32\svchost.exe -k Local Service')) "Unquoted service path check only looks at the executable part"
 
+    Write-TestHeader "Module Selection"
+    $avail = @(Get-ScanModules -ModulesDir "$repoRoot\modules" | ForEach-Object { $_.Name })
+    Assert-True ($avail -contains "Network" -and $avail -contains "FileSystem") "Modules are discovered from modules\Check-*.ps1"
+    $sel = Resolve-ModuleSelection -Available $avail -Modules @("network") -SkipModules @()
+    Assert-True ($sel.Skip -notcontains "Network" -and $sel.Skip -contains "Processes" -and $sel.Skip -notcontains "Baseline" -and $sel.Unknown.Count -eq 0) "-Modules runs only the named modules (case-insensitive), Baseline kept"
+    $sel = Resolve-ModuleSelection -Available $avail -SkipModules @("Netwrok", "Baseline")
+    Assert-True ($sel.Unknown -contains "Netwrok" -and $sel.Skip -contains "Baseline" -and $sel.Skip -notcontains "Network") "Unknown -SkipModules names are reported"
+    $sel = Resolve-ModuleSelection -Available $avail -SkipModules @("Network, Accounts")
+    Assert-True ($sel.Skip -contains "Network" -and $sel.Skip -contains "Accounts" -and $sel.Unknown.Count -eq 0) "A comma-separated single string (powershell.exe -File) is split into names"
+    $listOut = & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File "$repoRoot\AmIHacked.ps1" -ListModules 2>&1 | Out-String
+    Assert-True ($listOut -match "(?m)^Network\s+Network Indicators" -and $listOut -notmatch "AM I HACKED") "-ListModules prints module names and descriptions without scanning"
+
     Write-TestHeader "Hosts File Security Entries"
     $adBlock = @("0.0.0.0 googleads.g.doubleclick.net", "0.0.0.0 google-analytics.com", "0.0.0.0 avgthing.example.com", "0.0.0.0 example.com # virustotal", "0.0.0.0 vortex.data.microsoft.com")
     Assert-True (@(Get-HostsSecurityEntry -Lines $adBlock).Count -eq 0) "Ad-block and telemetry hosts lines are not security entries"

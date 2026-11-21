@@ -113,6 +113,8 @@ Baselines enable **change detection** — the most powerful signal for catching 
 |-----------|-------------|
 | `-OutputPath` | Report output directory (default: `.\reports`) |
 | `-SkipModules` | Module names to skip (e.g. `Network,Accounts,Baseline`) |
+| `-Modules` | Run only these modules, e.g. `-Modules Network,Processes` (Baseline still runs unless skipped) |
+| `-ListModules` | List available module names and descriptions, then exit |
 | `-ConfigPath` | Path to `config.json` (default: `.\config\config.json`) |
 | `-Offline` | Disable all external API calls |
 | `-BaselinePath` | Path to a specific baseline JSON |

@@ -353,6 +353,49 @@ function Get-DefaultConfig {
     }
 }
 
+function Get-ScanModules {
+    <# Discovers modules\Check-*.ps1; the module name comes from the filename, the description from the MODULE metadata block. #>
+    param([string]$ModulesDir)
+    if (-not (Test-Path $ModulesDir)) { return @() }
+    return @(Get-ChildItem $ModulesDir -Filter "Check-*.ps1" | ForEach-Object {
+        $name = $_.BaseName -replace '^Check-', ''
+        $description = "$name Analysis"
+        $content = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
+        if ($content -match '(?s)<#\s*MODULE\s*\r?\n(.*?)#>') {
+            $metaBlock = $Matches[1]
+            if ($metaBlock -match 'Description:\s*(.+)') {
+                $description = $Matches[1].Trim()
+            }
+        }
+        @{ Name = $name; File = $_.Name; Description = $description; FullPath = $_.FullName }
+    })
+}
+
+function Resolve-ModuleSelection {
+    <#
+        Turns -Modules / -SkipModules into the final skip list. Names are matched case-insensitively
+        against the discovered modules ("Baseline" is also accepted). Unknown names are returned in
+        Unknown so the caller can warn; -Modules keeps Baseline unless it is skipped explicitly.
+    #>
+    param([string[]]$Available, [string[]]$Modules = @(), [string[]]$SkipModules = @())
+    # powershell.exe -File passes "-SkipModules A,B" as the single string "A,B"
+    $Modules = @($Modules | ForEach-Object { "$_" -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    $SkipModules = @($SkipModules | ForEach-Object { "$_" -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    $valid = @($Available) + @("Baseline")
+    $unknown = @(@($Modules) + @($SkipModules) | Where-Object { $_ -and $_ -notin $valid } | Select-Object -Unique)
+    $skip = [System.Collections.ArrayList]::new()
+    foreach ($n in @($SkipModules)) {
+        $match = $valid | Where-Object { $_ -eq $n } | Select-Object -First 1
+        if ($match -and $match -notin $skip) { $skip.Add($match) | Out-Null }
+    }
+    if (@($Modules | Where-Object { $_ }).Count -gt 0) {
+        foreach ($a in $Available) {
+            if ($a -notin $Modules -and $a -notin $skip) { $skip.Add($a) | Out-Null }
+        }
+    }
+    return [PSCustomObject]@{ Skip = @($skip); Unknown = $unknown; Valid = $valid }
+}
+
 function Merge-Config {
     <#
         Overlays the properties of a user config (from config.json) onto the built-in defaults, so a
