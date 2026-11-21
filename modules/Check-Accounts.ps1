@@ -180,16 +180,12 @@ function Invoke-AccountsChecks {
     Write-Status "Checking RDP session history..."
 
     try {
-        $rdpLogins = Get-WinEvent -FilterHashtable @{
-            LogName = 'Security'
-            Id = 4624
-        } -MaxEvents $maxEvents -ErrorAction SilentlyContinue | Where-Object {
-            $xml = [xml]$_.ToXml()
-            $logonType = ($xml.Event.EventData.Data | Where-Object { $_.Name -eq 'LogonType' }).'#text'
-            $logonType -eq "10"
-        }
+        # Filter LogonType 10 in the query itself: capping 4624 events first would only cover the
+        # newest $maxEvents logons of any type (often just a few hours on a busy machine).
+        $rdpXPath = "*[System[EventID=4624] and EventData[Data[@Name='LogonType']='10']]"
+        $rdpLogins = @(Get-WinEvent -LogName 'Security' -FilterXPath $rdpXPath -MaxEvents $maxEvents -ErrorAction SilentlyContinue)
 
-        if ($rdpLogins -and $rdpLogins.Count -gt 0) {
+        if ($rdpLogins.Count -gt 0) {
             $rdpDetails = $rdpLogins | ForEach-Object {
                 $xml = [xml]$_.ToXml()
                 $data = $xml.Event.EventData.Data

@@ -173,6 +173,21 @@ $script:Findings = [System.Collections.ArrayList]::new()
 Invoke-AccountsChecks *> $null
 Assert-True (@($script:Findings | Where-Object { $_.Title -eq 'Hidden Account Detected: zzz-hidden$' }).Count -eq 1) "Account without PasswordLastSet does not stop enumeration (later hidden account reported)"
 Assert-True (@($script:Findings | Where-Object { $_.Title -eq 'No Password Set Date: aaa-test' }).Count -eq 1) "Enabled account without PasswordLastSet gets its own finding"
+
+Write-TestHeader "RDP Logon Query"
+# Mock Get-WinEvent: return RDP events only when the query itself filters LogonType 10.
+function Get-WinEvent {
+    param([string]$LogName, [string]$FilterXPath, [hashtable]$FilterHashtable, [int]$MaxEvents)
+    if ($LogName -ne 'Security' -or $FilterXPath -notmatch "LogonType'\]='10'") { return }
+    foreach ($i in 1..3) {
+        $evt = [PSCustomObject]@{ TimeCreated = (Get-Date).AddDays(-$i) }
+        $evt | Add-Member -MemberType ScriptMethod -Name ToXml -Value { '<Event><EventData><Data Name="TargetUserName">bob</Data><Data Name="IpAddress">203.0.113.5</Data><Data Name="WorkstationName">X</Data><Data Name="LogonType">10</Data></EventData></Event>' }
+        $evt
+    }
+}
+$script:Findings = [System.Collections.ArrayList]::new()
+Invoke-AccountsChecks *> $null
+Assert-True (@($script:Findings | Where-Object { $_.Title -eq "RDP Logins Detected: 3 sessions" }).Count -eq 1) "RDP logons are filtered by LogonType in the event log query"
 Remove-Item Function:\Get-LocalUser, Function:\Get-WinEvent, Function:\Get-LocalGroupMember
 
 Write-TestHeader "Baseline Tasks and Exclusions"
