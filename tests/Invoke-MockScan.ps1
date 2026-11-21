@@ -109,6 +109,16 @@ Assert-True ($info104.Channel -eq "System" -and $info104.Account -eq "CONTOSO\al
 $clearSources = @(Get-ChildItem "$repoRoot\modules" -Filter "Check-*.ps1" | Select-String -Pattern "Id\s*=\s*1102" | Select-Object -ExpandProperty Path -Unique)
 Assert-True ($clearSources.Count -eq 1) "Event log clears (1102) are detected by exactly one module" "$($clearSources.Count) modules"
 
+Write-TestHeader "Root CA Trust List"
+Assert-True ((Get-CertDisplayName 'CN="Electronic Arts, Inc.", OU=EA, O="Electronic Arts, Inc."') -eq 'Electronic Arts, Inc.') "Root CA display name has no surrounding quotes"
+$trustedRoots = Get-TrustedRootThumbprints
+$selfSigned = [System.Security.Cryptography.X509Certificates.CertificateRequest]::new("CN=AmIHacked Test Root", [System.Security.Cryptography.RSA]::Create(2048), [System.Security.Cryptography.HashAlgorithmName]::SHA256, [System.Security.Cryptography.RSASignaturePadding]::Pkcs1).CreateSelfSigned([DateTimeOffset]::Now, [DateTimeOffset]::Now.AddDays(1))
+Assert-True (-not $trustedRoots.Thumbprints.ContainsKey($selfSigned.Thumbprint)) "A new self-signed root is not on the trusted root list"
+if ($trustedRoots.FromCtl) {
+    # Microsoft Root Certificate Authority 2011, present in every Windows 10/11 Root store
+    Assert-True ($trustedRoots.Thumbprints.ContainsKey("8F43288AD272F3103B6FB1428485EA3014C0BCFE")) "Windows default root is on the trusted root list (authroot CTL)"
+}
+
 Write-TestHeader "Hosts File Security Entries"
 $adBlock = @("0.0.0.0 googleads.g.doubleclick.net", "0.0.0.0 google-analytics.com", "0.0.0.0 avgthing.example.com", "0.0.0.0 example.com # virustotal", "0.0.0.0 vortex.data.microsoft.com")
 Assert-True (@(Get-HostsSecurityEntry -Lines $adBlock).Count -eq 0) "Ad-block and telemetry hosts lines are not security entries"

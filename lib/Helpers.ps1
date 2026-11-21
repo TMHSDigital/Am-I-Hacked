@@ -501,6 +501,63 @@ function Select-MpExclusion {
     return @($Values | Where-Object { $_ -and "$_" -notmatch '^N/A:' })
 }
 
+function Get-TrustedRootThumbprints {
+    <#
+        Thumbprints of roots that Windows itself distributes or that an enterprise deployed:
+        - the Microsoft Trusted Root Program list cached in the authroot CTL (AuthRoot\AutoUpdate\EncodedCtl);
+          SHA-1 subject identifiers appear in it as 20-byte OCTET STRINGs (04 14 ...)
+        - the LocalMachine\AuthRoot store
+        - Group Policy / enterprise roots
+        - legacy Windows roots that are not in the CTL
+        FromCtl is false when the CTL is not cached, so callers can fall back to a coarser check.
+    #>
+    $set = @{}
+    foreach ($t in @(
+        "7F88CD7223F3C813818C994614A89C99FA3B5247",  # Microsoft Authenticode(tm) Root Authority
+        "245C97DF7514E7CF2DF8BE72AE957B9E04741E85",  # Microsoft Time Stamping Service Root
+        "EBE112F56D5FE0BA23289319C89D7784A10CEB61",  # XBL Client IPsec Issuing CA (installed by Windows Xbox components)
+        "645984515AB9FB7AE8065B9DDB0E908F8E870ED5"   # XBL Server IPsec Issuing CA
+    )) { $set[$t] = "Windows" }
+
+    $fromCtl = $false
+    try {
+        $ctl = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\SystemCertificates\AuthRoot\AutoUpdate' -ErrorAction Stop).EncodedCtl
+        if ($ctl -and $ctl.Length -gt 22) {
+            $hex = [System.BitConverter]::ToString([byte[]]$ctl).Replace('-', '')
+            foreach ($m in [regex]::Matches($hex, '0414([0-9A-F]{40})')) {
+                if ($m.Index % 2 -eq 0) { $set[$m.Groups[1].Value] = "CTL" }
+            }
+            $fromCtl = $true
+        }
+    } catch {
+        Write-Verbose "authroot CTL not available: $_"
+    }
+
+    try {
+        $store = New-Object System.Security.Cryptography.X509Certificates.X509Store("AuthRoot", "LocalMachine")
+        $store.Open("ReadOnly")
+        foreach ($c in $store.Certificates) { $set[$c.Thumbprint] = "AuthRoot" }
+        $store.Close()
+    } catch {
+        Write-Verbose "Could not read AuthRoot store: $_"
+    }
+
+    foreach ($gpoPath in @('HKLM:\SOFTWARE\Policies\Microsoft\SystemCertificates\Root\Certificates',
+                           'HKLM:\SOFTWARE\Microsoft\EnterpriseCertificates\Root\Certificates')) {
+        Get-ChildItem $gpoPath -ErrorAction SilentlyContinue | ForEach-Object { $set[$_.PSChildName.ToUpper()] = "Enterprise" }
+    }
+
+    return [PSCustomObject]@{ Thumbprints = $set; FromCtl = $fromCtl }
+}
+
+function Get-CertDisplayName {
+    <# CN of a subject without surrounding quotes, else the first 60 characters of the subject. #>
+    param([string]$Subject)
+    if ($Subject -match 'CN=("[^"]*"|[^,]+)') { return $Matches[1].Trim('"').Trim() }
+    if (-not $Subject) { return "" }
+    return $Subject.Substring(0, [math]::Min(60, $Subject.Length))
+}
+
 function ConvertTo-WmiRefString {
     <# Formats a binding's Filter/Consumer reference as 'Class.Name="X"' (CIM returns an instance, WMI a path string). #>
     param($Ref)

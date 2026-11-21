@@ -341,19 +341,31 @@ function Invoke-DefenseEvasionChecks {
             'CFCA', 'XRamp'
         )
 
-        $rootCerts = Get-ChildItem "Cert:\LocalMachine\Root" -ErrorAction SilentlyContinue
+        $trustedRoots = Get-TrustedRootThumbprints
+        if (-not $trustedRoots.FromCtl) {
+            Write-Status "Microsoft trusted root list (authroot CTL) not cached; falling back to CA name matching." -Color DarkGray
+        }
+
+        # Read the store directly: the Cert: drive is missing when Microsoft.PowerShell.Security fails to load
+        $rootStore = New-Object System.Security.Cryptography.X509Certificates.X509Store("Root", "LocalMachine")
+        $rootStore.Open("ReadOnly")
+        $rootCerts = @($rootStore.Certificates)
+        $rootStore.Close()
+
         foreach ($cert in $rootCerts) {
-            $subjectOrFriendly = if ($cert.Subject) { $cert.Subject } else { $cert.FriendlyName }
-            $isKnown = $false
-            foreach ($ca in $knownCAs) {
-                if ($subjectOrFriendly -like "*$ca*") { $isKnown = $true; break }
+            $isKnown = $trustedRoots.Thumbprints.ContainsKey($cert.Thumbprint)
+            if (-not $isKnown -and -not $trustedRoots.FromCtl) {
+                $subjectOrFriendly = if ($cert.Subject) { $cert.Subject } else { $cert.FriendlyName }
+                foreach ($ca in $knownCAs) {
+                    if ($subjectOrFriendly -like "*$ca*") { $isKnown = $true; break }
+                }
             }
             if (-not $isKnown) {
-                $displayName = if ($cert.Subject -match 'CN=([^,]+)') { $Matches[1] } else { $cert.Subject.Substring(0, [math]::Min(60, $cert.Subject.Length)) }
+                $displayName = Get-CertDisplayName $cert.Subject
                 Add-Finding -Severity "WARNING" -Category "DefenseEvasion" `
                     -Title "Unknown Root CA: $displayName" `
-                    -Description "Root certificate '$($cert.Subject)' in Cert:\LocalMachine\Root is not in the well-known CA list. This could be a corporate proxy CA (benign) or a rogue certificate installed by malware to intercept HTTPS traffic via MITM." `
-                    -Remediation "Review the certificate in certlm.msc. If unexpected, remove it: Remove-Item 'Cert:\LocalMachine\Root\$($cert.Thumbprint)'" `
+                    -Description "Root certificate '$($cert.Subject)' in LocalMachine\Root is not distributed by the Microsoft Trusted Root Program, shipped with Windows, or deployed by Group Policy. This could be a root added by installed software or a corporate proxy (benign), or a rogue certificate installed by malware to intercept HTTPS traffic via MITM." `
+                    -Remediation "Review the certificate in certlm.msc. If unexpected, remove it: certutil -delstore Root $($cert.Thumbprint)" `
                     -Details @{
                         Subject      = $cert.Subject
                         Thumbprint   = $cert.Thumbprint
