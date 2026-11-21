@@ -420,6 +420,25 @@ function Get-FileSignature {
     return [PSCustomObject]@{ Status = "CheckFailed"; StatusMessage = "Signature check unavailable (PS.Security module could not be loaded)." }
 }
 
+function Test-AVProductEnabled {
+    <# Decodes Security Center productState: 0x10 in the middle byte (0x00FF00) means the real-time scanner is on. #>
+    param([int]$ProductState)
+    return ((($ProductState -shr 8) -band 0x10) -ne 0)
+}
+
+function Get-ActiveThirdPartyAV {
+    <# Names of enabled antivirus products registered with Security Center, other than Microsoft Defender. #>
+    try {
+        $products = @(Get-CimInstance -Namespace "root\SecurityCenter2" -ClassName AntiVirusProduct -ErrorAction Stop)
+    } catch {
+        Write-Verbose "Could not query SecurityCenter2 AntiVirusProduct: $_"
+        return @()
+    }
+    return @($products | Where-Object {
+        $_.displayName -notmatch 'Windows Defender|Microsoft Defender' -and (Test-AVProductEnabled ([int]$_.productState))
+    } | ForEach-Object { $_.displayName })
+}
+
 function Get-MaxSeverity {
     <# Returns the more severe of two severities (INFO < WARNING < CRITICAL), so later rules can only raise severity. #>
     param([string]$Current, [string]$New)

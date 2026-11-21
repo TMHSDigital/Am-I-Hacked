@@ -155,7 +155,25 @@ function Invoke-DefenseEvasionChecks {
 
     try {
         $mpStatus = Get-MpComputerStatus -ErrorAction SilentlyContinue
+        $otherAV = @()
         if ($mpStatus) {
+            $runningMode = "$($mpStatus.AMRunningMode)"
+            $defenderOff = (-not $mpStatus.RealTimeProtectionEnabled) -or (-not $mpStatus.AntivirusEnabled) -or ($runningMode -match 'Passive|Disabled')
+            if ($defenderOff) { $otherAV = @(Get-ActiveThirdPartyAV) }
+        }
+        if ($mpStatus -and $otherAV.Count -gt 0) {
+            Add-Finding -Severity "INFO" -Category "DefenseEvasion" `
+                -Title "Defender Passive; $($otherAV -join ', ') Active" `
+                -Description "Windows Defender is not providing real-time protection (running mode: $(if ($runningMode) { $runningMode } else { 'unknown' })), but another antivirus product is registered and enabled with Windows Security Center: $($otherAV -join ', '). Windows switches Defender to passive mode when a third-party antivirus is installed." `
+                -Remediation "No action needed if you installed $($otherAV -join ', ') yourself. If you did not, investigate the product and check Windows Security > Virus & threat protection." `
+                -Details @{
+                    AMRunningMode = $runningMode
+                    RealTimeProtection = $mpStatus.RealTimeProtectionEnabled
+                    AntivirusEnabled = $mpStatus.AntivirusEnabled
+                    ActiveProducts = $otherAV
+                } `
+                -MITRE @("T1562.001")
+        } elseif ($mpStatus) {
             if (-not $mpStatus.RealTimeProtectionEnabled) {
                 Add-Finding -Severity "CRITICAL" -Category "DefenseEvasion" `
                     -Title "Defender Real-Time Protection Disabled" `

@@ -126,6 +126,27 @@ $sigFindings = @($script:Findings | Where-Object { $_.Title -match '^(Unsigned/I
 Assert-True ($sigFindings.Count -eq 0) "No process finding is raised only because the signature check failed" "$($sigFindings.Count) findings, e.g. $(($sigFindings | Select-Object -First 2 -ExpandProperty Title) -join '; ')"
 Remove-Item Function:\Get-FileSignature
 . "$repoRoot\lib\Helpers.ps1"
+
+Write-TestHeader "Defender With Third-Party Antivirus"
+Assert-True ((Test-AVProductEnabled 0x061000) -and -not (Test-AVProductEnabled 0x060000)) "Security Center productState decoding (0x061000 on, 0x060000 off)"
+. "$repoRoot\modules\Check-DefenseEvasion.ps1"
+function Get-MpComputerStatus { [PSCustomObject]@{ AMRunningMode = "Passive Mode"; RealTimeProtectionEnabled = $false; AntivirusEnabled = $false; AntispywareEnabled = $false; AntivirusSignatureAge = 0 } }
+$script:Config = Get-DefaultConfig
+foreach ($mockAV in @(@("Contoso AV"), @())) {
+    $script:MockAV = $mockAV
+    function Get-ActiveThirdPartyAV { $script:MockAV }
+    $script:Findings = [System.Collections.ArrayList]::new()
+    Invoke-DefenseEvasionChecks *> $null
+    $defCrit = @($script:Findings | Where-Object { $_.Title -in @("Defender Real-Time Protection Disabled", "Antivirus Engine Disabled") })
+    if ($mockAV.Count -gt 0) {
+        $passive = @($script:Findings | Where-Object { $_.Title -like "*Contoso AV*" -and $_.Severity -eq "INFO" })
+        Assert-True ($defCrit.Count -eq 0 -and $passive.Count -eq 1) "Third-party AV active: no Defender CRITICAL, one INFO naming the product" "$($defCrit.Count) critical, $($passive.Count) info"
+    } else {
+        Assert-True ($defCrit.Count -eq 2) "No other AV active: Defender-disabled CRITICALs still raised" "$($defCrit.Count) critical"
+    }
+}
+Remove-Item Function:\Get-MpComputerStatus, Function:\Get-ActiveThirdPartyAV
+. "$repoRoot\lib\Helpers.ps1"
 $script:Config = @{}
 $script:Findings = $null
 
