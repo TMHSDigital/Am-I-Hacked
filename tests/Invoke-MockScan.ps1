@@ -160,6 +160,23 @@ try {
         Assert-True (Test-IsDefaultWmiBinding (ConvertTo-WmiRefString $liveDefault[0].Filter) (ConvertTo-WmiRefString $liveDefault[0].Consumer)) "Live default SCM binding (via Get-CimInstance) is allowlisted"
     }
 
+    Write-TestHeader "Signature Lookup Caching"
+    $script:AuthenticodeCalls = 0
+    function Get-AuthenticodeSignature { param($FilePath, $ErrorAction) $script:AuthenticodeCalls++; [PSCustomObject]@{ Status = "Valid" } }
+    $script:SignatureCache = @{}
+    $script:SignatureCheckAvailable = $true
+    $null = Get-FileSignature -FilePath "C:\Windows\explorer.exe"
+    $null = Get-FileSignature -FilePath "C:\WINDOWS\explorer.exe"
+    Assert-True ($script:AuthenticodeCalls -eq 1) "Each file path is verified at most once per scan" "$($script:AuthenticodeCalls) calls"
+    $script:SignatureCheckAvailable = $false
+    $degradedSig = Get-FileSignature -FilePath "C:\Windows\notepad.exe"
+    Assert-True ($degradedSig.Status -eq "CheckFailed" -and $script:AuthenticodeCalls -eq 1) "Unavailable signature checks return CheckFailed without calling the cmdlet"
+    $helpersText = Get-Content "$repoRoot\lib\Helpers.ps1" -Raw
+    Assert-True ($helpersText -notmatch '(?m)^\s*Import-Module\s+Microsoft\.PowerShell\.Security') "Get-FileSignature does not re-import the Security module"
+    Remove-Item Function:\Get-AuthenticodeSignature
+    $script:SignatureCheckAvailable = $null
+    $script:SignatureCache = @{}
+
     Write-TestHeader "Degraded Signature Checks"
     # Simulate Get-AuthenticodeSignature being unavailable: every signature comes back as CheckFailed.
     . "$repoRoot\modules\Check-Processes.ps1"

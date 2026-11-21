@@ -409,15 +409,27 @@ function Test-IsPrivateIP {
 }
 
 function Get-FileSignature {
+    <#
+        Authenticode signature of a file, cached per path for the rest of the scan.
+        The Security module is imported once in the orchestrator's preflight; when that preflight found
+        Get-AuthenticodeSignature unavailable ($script:SignatureCheckAvailable -eq $false), return the
+        CheckFailed sentinel straight away so callers don't treat the file as unsigned.
+    #>
     param([string]$FilePath)
-    # Force-load the module; suppress TypeData-conflict errors that occur in some PS 5.1 sessions
-    Import-Module Microsoft.PowerShell.Security -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue 2>$null
+    $sentinel = [PSCustomObject]@{ Status = "CheckFailed"; StatusMessage = "Signature check unavailable (PS.Security module could not be loaded)." }
+    if ($script:SignatureCheckAvailable -eq $false) { return $sentinel }
+    if (-not $script:SignatureCache) { $script:SignatureCache = @{} }
+    $cacheKey = "$FilePath".ToLowerInvariant()
+    if ($script:SignatureCache.ContainsKey($cacheKey)) { return $script:SignatureCache[$cacheKey] }
+    $result = $sentinel
     try {
         $sig = Get-AuthenticodeSignature $FilePath -ErrorAction SilentlyContinue
-        if ($sig) { return $sig }
-    } catch { }
-    # If the module still couldn't load, return a sentinel so callers don't treat it as "unsigned"
-    return [PSCustomObject]@{ Status = "CheckFailed"; StatusMessage = "Signature check unavailable (PS.Security module could not be loaded)." }
+        if ($sig) { $result = $sig }
+    } catch {
+        Write-Verbose "Get-AuthenticodeSignature failed for '$FilePath': $_"
+    }
+    $script:SignatureCache[$cacheKey] = $result
+    return $result
 }
 
 function ConvertFrom-LogClearedXml {
