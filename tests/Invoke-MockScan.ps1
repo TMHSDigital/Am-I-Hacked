@@ -192,6 +192,22 @@ try {
     $selfOnly = @(Get-PowerShellProfileCandidates -UsersRoot $fakeUsers -CurrentUserDocuments (Join-Path $testTempDir "MyDocs") -CurrentUserName "me")
     Assert-True (@($selfOnly | Where-Object { $_.Owner -eq "bob" }).Count -eq 0) "Without admin, other users' profiles are not scanned"
 
+    Write-TestHeader "VirusTotal Lookup Limits"
+    $vtFiles = foreach ($i in 1..6) { $vf = Join-Path $testTempDir "vt$i.bin"; "vt sample $i" | Set-Content $vf; Get-Item $vf }
+    function Invoke-RestMethod { $script:VTCalls++; throw "mock HTTP error" }
+    function Get-HttpStatusCode { param($ErrorRecord) $script:MockHttpStatus }
+    $script:Findings = [System.Collections.ArrayList]::new()
+    $script:VTCalls = 0; $script:MockHttpStatus = 404
+    Invoke-VirusTotalLookups -Files $vtFiles -ApiKey "x" -MaxLookups 4 *> $null
+    Assert-True ($script:VTCalls -eq 4 -and @($script:Findings | Where-Object { $_.Title -like "Unknown to VirusTotal*" }).Count -eq 4) "404 responses count toward MaxVTLookups" "$($script:VTCalls) requests"
+    foreach ($code in @(401, 429)) {
+        $script:VTCalls = 0; $script:MockHttpStatus = $code
+        $vtOut = Invoke-VirusTotalLookups -Files $vtFiles -ApiKey "x" -MaxLookups 4 *>&1 | Out-String
+        Assert-True ($script:VTCalls -eq 1 -and $vtOut -match "HTTP $code") "HTTP $code stops VirusTotal lookups with a visible status line" "$($script:VTCalls) requests"
+    }
+    Remove-Item Function:\Invoke-RestMethod, Function:\Get-HttpStatusCode
+    . "$repoRoot\lib\Helpers.ps1"
+
     Write-TestHeader "Hosts File Security Entries"
     $adBlock = @("0.0.0.0 googleads.g.doubleclick.net", "0.0.0.0 google-analytics.com", "0.0.0.0 avgthing.example.com", "0.0.0.0 example.com # virustotal", "0.0.0.0 vortex.data.microsoft.com")
     Assert-True (@(Get-HostsSecurityEntry -Lines $adBlock).Count -eq 0) "Ad-block and telemetry hosts lines are not security entries"

@@ -200,55 +200,7 @@ function Invoke-FileSystemChecks {
     if (-not $script:OfflineMode -and $vtKey -and $vtCandidates.Count -gt 0) {
         Write-Status "Checking file hashes against VirusTotal..."
 
-        $checked = 0
-        $maxVT = [int]$script:Config.MaxVTLookups
-
-        foreach ($file in $vtCandidates) {
-            if ($checked -ge $maxVT) {
-                Write-Status "VirusTotal rate limit reached. Remaining files skipped." -Color Yellow
-                break
-            }
-
-            try {
-                $hash = (Get-FileHash $file.FullName -Algorithm SHA256 -ErrorAction SilentlyContinue).Hash
-                if (-not $hash) { continue }
-
-                $vtResponse = Invoke-RestMethod -Uri "https://www.virustotal.com/api/v3/files/$hash" `
-                    -Headers @{ "x-apikey" = $vtKey } `
-                    -Method GET -ErrorAction Stop
-
-                $checked++
-                $stats = $vtResponse.data.attributes.last_analysis_stats
-                $detections = $stats.malicious + $stats.suspicious
-
-                if ($detections -gt 0) {
-                    $severity = if ($detections -ge 5) { "CRITICAL" } else { "WARNING" }
-
-                    Add-Finding -Severity $severity -Category "FileSystem" `
-                        -Title "VirusTotal Detection: $($file.Name) ($detections engines)" `
-                        -Description "File '$($file.Name)' (SHA256: $hash) is flagged by $detections VirusTotal engines ($($stats.malicious) malicious, $($stats.suspicious) suspicious out of $($stats.undetected + $detections) total)." `
-                        -Remediation "Delete this file immediately. Run a full system scan. Consider this system potentially compromised." `
-                        -Details @{
-                            Path = $file.FullName
-                            SHA256 = $hash
-                            Detections = $detections
-                            Malicious = $stats.malicious
-                            Suspicious = $stats.suspicious
-                            Harmless = $stats.harmless
-                            Undetected = $stats.undetected
-                            VTLink = "https://www.virustotal.com/gui/file/$hash"
-                        } `
-                        -MITRE @("T1204.002")
-                }
-            } catch {
-                if ($_.Exception.Response.StatusCode -eq 404) {
-                    Add-Finding -Severity "INFO" -Category "FileSystem" `
-                        -Title "Unknown to VirusTotal: $($file.Name)" `
-                        -Description "File '$($file.Name)' hash is not in the VirusTotal database. This means it's either very new, custom-built, or rarely seen — which can be suspicious for executables." `
-                        -Details @{ Path = $file.FullName }
-                }
-            }
-        }
+        Invoke-VirusTotalLookups -Files $vtCandidates -ApiKey $vtKey -MaxLookups ([int]$script:Config.MaxVTLookups)
     } elseif ($script:OfflineMode -and $vtCandidates.Count -gt 0) {
         Add-Finding -Severity "INFO" -Category "FileSystem" `
             -Title "VirusTotal Check Skipped (Offline Mode)" `

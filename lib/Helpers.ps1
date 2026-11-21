@@ -494,6 +494,85 @@ function ConvertFrom-LogClearedXml {
     return [PSCustomObject]@{ Channel = $data.Channel; Account = $account }
 }
 
+function Get-HttpStatusCode {
+    <# HTTP status code (int) from an Invoke-RestMethod/Invoke-WebRequest error record, or $null. #>
+    param($ErrorRecord)
+    try {
+        $resp = $ErrorRecord.Exception.Response
+        if ($resp -and $null -ne $resp.StatusCode) { return [int]$resp.StatusCode }
+    } catch {
+        Write-Verbose "No HTTP status in error: $_"
+    }
+    return $null
+}
+
+function Invoke-VirusTotalLookups {
+    <#
+        Looks up file hashes on VirusTotal. At most -MaxLookups requests are sent, whatever the
+        responses (404 "unknown" counts too). A rejected key (401/403) or rate limit (429) stops the
+        loop with a visible status line; other errors are reported per file.
+    #>
+    param([object[]]$Files, [string]$ApiKey, [int]$MaxLookups)
+    $checked = 0
+
+    foreach ($file in $Files) {
+        if ($checked -ge $MaxLookups) {
+            Write-Status "VirusTotal rate limit reached. Remaining files skipped." -Color Yellow
+            break
+        }
+
+        try {
+            $hash = (Get-FileHash $file.FullName -Algorithm SHA256 -ErrorAction SilentlyContinue).Hash
+            if (-not $hash) { continue }
+
+            # Count the attempt before sending it, so 404s and errors also use up the budget
+            $checked++
+            $vtResponse = Invoke-RestMethod -Uri "https://www.virustotal.com/api/v3/files/$hash" `
+                -Headers @{ "x-apikey" = $ApiKey } `
+                -Method GET -ErrorAction Stop
+
+            $stats = $vtResponse.data.attributes.last_analysis_stats
+            $detections = $stats.malicious + $stats.suspicious
+
+            if ($detections -gt 0) {
+                $severity = if ($detections -ge 5) { "CRITICAL" } else { "WARNING" }
+
+                Add-Finding -Severity $severity -Category "FileSystem" `
+                    -Title "VirusTotal Detection: $($file.Name) ($detections engines)" `
+                    -Description "File '$($file.Name)' (SHA256: $hash) is flagged by $detections VirusTotal engines ($($stats.malicious) malicious, $($stats.suspicious) suspicious out of $($stats.undetected + $detections) total)." `
+                    -Remediation "Delete this file immediately. Run a full system scan. Consider this system potentially compromised." `
+                    -Details @{
+                        Path = $file.FullName
+                        SHA256 = $hash
+                        Detections = $detections
+                        Malicious = $stats.malicious
+                        Suspicious = $stats.suspicious
+                        Harmless = $stats.harmless
+                        Undetected = $stats.undetected
+                        VTLink = "https://www.virustotal.com/gui/file/$hash"
+                    } `
+                    -MITRE @("T1204.002")
+            }
+        } catch {
+            $status = Get-HttpStatusCode $_
+            if ($status -eq 404) {
+                Add-Finding -Severity "INFO" -Category "FileSystem" `
+                    -Title "Unknown to VirusTotal: $($file.Name)" `
+                    -Description "File '$($file.Name)' hash is not in the VirusTotal database. This means it's either very new, custom-built, or rarely seen — which can be suspicious for executables." `
+                    -Details @{ Path = $file.FullName }
+            } elseif ($status -in @(401, 403)) {
+                Write-Status "VirusTotal rejected the API key (HTTP $status). Check 'VirusTotalAPIKey' in config.json. Remaining files skipped." -Color Yellow
+                break
+            } elseif ($status -eq 429) {
+                Write-Status "VirusTotal quota or rate limit exceeded (HTTP 429). Remaining files skipped." -Color Yellow
+                break
+            } else {
+                Write-Status "VirusTotal lookup failed for $($file.Name): $(if ($status) { "HTTP $status" } else { $_.Exception.Message })" -Color Yellow
+            }
+        }
+    }
+}
+
 function Get-PowerShellProfileCandidates {
     <#
         Every PowerShell profile file that can run at startup, independent of the host running the scan:
