@@ -160,6 +160,20 @@ foreach ($mockAV in @(@("Contoso AV"), @())) {
 }
 Remove-Item Function:\Get-MpComputerStatus, Function:\Get-ActiveThirdPartyAV
 . "$repoRoot\lib\Helpers.ps1"
+
+Write-TestHeader "Accounts Without PasswordLastSet"
+. "$repoRoot\modules\Check-Accounts.ps1"
+function Get-LocalUser {
+    [PSCustomObject]@{ Name = "aaa-test"; Enabled = $true; Description = ""; PasswordLastSet = $null; PasswordRequired = $false; PasswordExpires = $null; LastLogon = $null; UserMayChangePassword = $true }
+    [PSCustomObject]@{ Name = "zzz-hidden$"; Enabled = $true; Description = ""; PasswordLastSet = (Get-Date).AddDays(-30); PasswordRequired = $true; PasswordExpires = (Get-Date).AddDays(30); LastLogon = $null; UserMayChangePassword = $true }
+}
+function Get-WinEvent { }
+function Get-LocalGroupMember { }
+$script:Findings = [System.Collections.ArrayList]::new()
+Invoke-AccountsChecks *> $null
+Assert-True (@($script:Findings | Where-Object { $_.Title -eq 'Hidden Account Detected: zzz-hidden$' }).Count -eq 1) "Account without PasswordLastSet does not stop enumeration (later hidden account reported)"
+Assert-True (@($script:Findings | Where-Object { $_.Title -eq 'No Password Set Date: aaa-test' }).Count -eq 1) "Enabled account without PasswordLastSet gets its own finding"
+Remove-Item Function:\Get-LocalUser, Function:\Get-WinEvent, Function:\Get-LocalGroupMember
 $script:Config = @{}
 $script:Findings = $null
 

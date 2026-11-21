@@ -18,51 +18,60 @@ function Invoke-AccountsChecks {
         $localUsers = Get-LocalUser -ErrorAction SilentlyContinue
 
         foreach ($user in $localUsers) {
-            if ($user.Enabled -and $user.Description -notmatch "Built-in" -and $user.Description -notmatch "Default") {
-                $age = (Get-Date) - $user.PasswordLastSet
+            try {
+                if ($user.Enabled -and $user.Description -notmatch "Built-in" -and $user.Description -notmatch "Default") {
+                    if (-not $user.PasswordLastSet) {
+                        Add-Finding -Severity "INFO" -Category "Account" `
+                            -Title "No Password Set Date: $($user.Name)" `
+                            -Description "Enabled local account '$($user.Name)' has no password-set date. This happens for accounts created without a password (for example 'New-LocalUser -NoPassword')." `
+                            -Remediation "Verify this account is legitimate. If you didn't create it, disable it: Disable-LocalUser -Name '$($user.Name)'" `
+                            -Details @{ Username = $user.Name; Enabled = $user.Enabled; PasswordRequired = $user.PasswordRequired; Description = $user.Description } `
+                            -MITRE @("T1136.001")
+                    } elseif (((Get-Date) - $user.PasswordLastSet).TotalDays -le $maxAgeDays) {
+                        Add-Finding -Severity "WARNING" -Category "Account" `
+                            -Title "Recently Created Account: $($user.Name)" `
+                            -Description "Local account '$($user.Name)' was created or had its password set within the last $maxAgeDays days (Password set: $($user.PasswordLastSet)). Attackers create local accounts for persistent access." `
+                            -Remediation "Verify this account is legitimate. If you didn't create it, disable it immediately: Disable-LocalUser -Name '$($user.Name)'" `
+                            -Details @{
+                                Username = $user.Name
+                                Enabled = $user.Enabled
+                                PasswordLastSet = $user.PasswordLastSet
+                                LastLogon = $user.LastLogon
+                                Description = $user.Description
+                                PasswordRequired = $user.PasswordRequired
+                                UserMayChangePassword = $user.UserMayChangePassword
+                            } `
+                            -MITRE @("T1136.001")
+                    }
 
-                if ($user.PasswordLastSet -and $age.TotalDays -le $maxAgeDays) {
-                    Add-Finding -Severity "WARNING" -Category "Account" `
-                        -Title "Recently Created Account: $($user.Name)" `
-                        -Description "Local account '$($user.Name)' was created or had its password set within the last $maxAgeDays days (Password set: $($user.PasswordLastSet)). Attackers create local accounts for persistent access." `
-                        -Remediation "Verify this account is legitimate. If you didn't create it, disable it immediately: Disable-LocalUser -Name '$($user.Name)'" `
-                        -Details @{
-                            Username = $user.Name
-                            Enabled = $user.Enabled
-                            PasswordLastSet = $user.PasswordLastSet
-                            LastLogon = $user.LastLogon
-                            Description = $user.Description
-                            PasswordRequired = $user.PasswordRequired
-                            UserMayChangePassword = $user.UserMayChangePassword
-                        } `
-                        -MITRE @("T1136.001")
+                    if (-not $user.PasswordRequired -and $user.Enabled) {
+                        Add-Finding -Severity "WARNING" -Category "Account" `
+                            -Title "No Password Required: $($user.Name)" `
+                            -Description "Local account '$($user.Name)' does not require a password. This is a significant security risk." `
+                            -Remediation "Set a strong password: Set-LocalUser -Name '$($user.Name)' -PasswordRequired `$true" `
+                            -Details @{ Username = $user.Name; Enabled = $user.Enabled } `
+                            -MITRE @("T1078.003")
+                    }
+
+                    if ($user.PasswordExpires -eq $null -and $user.Enabled -and $user.Name -ne "Administrator") {
+                        Add-Finding -Severity "INFO" -Category "Account" `
+                            -Title "Password Never Expires: $($user.Name)" `
+                            -Description "Account '$($user.Name)' has a password that never expires." `
+                            -Remediation "Consider setting a password expiration policy for better security hygiene." `
+                            -MITRE @("T1078.003")
+                    }
                 }
 
-                if (-not $user.PasswordRequired -and $user.Enabled) {
-                    Add-Finding -Severity "WARNING" -Category "Account" `
-                        -Title "No Password Required: $($user.Name)" `
-                        -Description "Local account '$($user.Name)' does not require a password. This is a significant security risk." `
-                        -Remediation "Set a strong password: Set-LocalUser -Name '$($user.Name)' -PasswordRequired `$true" `
-                        -Details @{ Username = $user.Name; Enabled = $user.Enabled } `
-                        -MITRE @("T1078.003")
+                if ($user.Name.EndsWith('$') -and $user.Enabled) {
+                    Add-Finding -Severity "CRITICAL" -Category "Account" `
+                        -Title "Hidden Account Detected: $($user.Name)" `
+                        -Description "Account '$($user.Name)' ends with '$' which is a technique used to hide accounts from normal enumeration. This is a strong indicator of compromise." `
+                        -Remediation "Investigate and disable this account immediately. Check how it was created using Event Viewer." `
+                        -Details @{ Username = $user.Name; Enabled = $user.Enabled; Created = $user.PasswordLastSet } `
+                        -MITRE @("T1136.001","T1564.002")
                 }
-
-                if ($user.PasswordExpires -eq $null -and $user.Enabled -and $user.Name -ne "Administrator") {
-                    Add-Finding -Severity "INFO" -Category "Account" `
-                        -Title "Password Never Expires: $($user.Name)" `
-                        -Description "Account '$($user.Name)' has a password that never expires." `
-                        -Remediation "Consider setting a password expiration policy for better security hygiene." `
-                        -MITRE @("T1078.003")
-                }
-            }
-
-            if ($user.Name.EndsWith('$') -and $user.Enabled) {
-                Add-Finding -Severity "CRITICAL" -Category "Account" `
-                    -Title "Hidden Account Detected: $($user.Name)" `
-                    -Description "Account '$($user.Name)' ends with '$' which is a technique used to hide accounts from normal enumeration. This is a strong indicator of compromise." `
-                    -Remediation "Investigate and disable this account immediately. Check how it was created using Event Viewer." `
-                    -Details @{ Username = $user.Name; Enabled = $user.Enabled; Created = $user.PasswordLastSet } `
-                    -MITRE @("T1136.001","T1564.002")
+            } catch {
+                Write-Status "Could not evaluate local user '$($user.Name)': $_" -Color Yellow
             }
         }
     } catch {
