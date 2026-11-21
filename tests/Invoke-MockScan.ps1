@@ -208,6 +208,12 @@ try {
     Remove-Item Function:\Invoke-RestMethod, Function:\Get-HttpStatusCode
     . "$repoRoot\lib\Helpers.ps1"
 
+    Write-TestHeader "Unquoted Service Paths"
+    Assert-True ((Test-UnquotedServicePath 'C:\Program Files\Vendor\svc.exe') -and
+                 -not (Test-UnquotedServicePath 'C:\Tools\svc.exe --run now') -and
+                 -not (Test-UnquotedServicePath '"C:\Program Files\Vendor\svc.exe" -x') -and
+                 -not (Test-UnquotedServicePath 'C:\Windows\System32\svchost.exe -k Local Service')) "Unquoted service path check only looks at the executable part"
+
     Write-TestHeader "Hosts File Security Entries"
     $adBlock = @("0.0.0.0 googleads.g.doubleclick.net", "0.0.0.0 google-analytics.com", "0.0.0.0 avgthing.example.com", "0.0.0.0 example.com # virustotal", "0.0.0.0 vortex.data.microsoft.com")
     Assert-True (@(Get-HostsSecurityEntry -Lines $adBlock).Count -eq 0) "Ad-block and telemetry hosts lines are not security entries"
@@ -311,6 +317,39 @@ try {
     $script:Findings = [System.Collections.ArrayList]::new()
     Invoke-AccountsChecks *> $null
     Assert-True (@($script:Findings | Where-Object { $_.Title -eq "RDP Logins Detected: 3 sessions" }).Count -eq 1) "RDP logons are filtered by LogonType in the event log query"
+
+    Write-TestHeader "Admin Group By SID"
+    $mySid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+    function Get-LocalGroupMember {
+        [PSCustomObject]@{ Name = "MicrosoftAccount\someone@outlook.com"; SID = $mySid; ObjectClass = "User"; PrincipalSource = "MicrosoftAccount" }
+        [PSCustomObject]@{ Name = "PC\Administrator"; SID = "S-1-5-21-1-2-3-500"; ObjectClass = "User"; PrincipalSource = "Local" }
+        [PSCustomObject]@{ Name = "PC\intruder"; SID = "S-1-5-21-1-2-3-1009"; ObjectClass = "User"; PrincipalSource = "Local" }
+    }
+    $script:Findings = [System.Collections.ArrayList]::new()
+    Invoke-AccountsChecks *> $null
+    $unexpectedAdmins = @($script:Findings | Where-Object { $_.Title -like "Unexpected Admin:*" })
+    Assert-True ($unexpectedAdmins.Count -eq 1 -and $unexpectedAdmins[0].Title -eq "Unexpected Admin: PC\intruder") "Admin check matches the current user and built-in Administrator by SID" (($unexpectedAdmins | ForEach-Object { $_.Title }) -join "; ")
+
+    Write-TestHeader "Failed Logon Grouping"
+    function Get-WinEvent {
+        param([string]$LogName, [string]$FilterXPath, [hashtable]$FilterHashtable, [int]$MaxEvents)
+        if ($FilterXPath -notmatch 'EventID=4625\]') { return }
+        foreach ($i in 1..12) {
+            $evt = [PSCustomObject]@{ TimeCreated = (Get-Date).AddMinutes(-$i) }
+            $evt | Add-Member -MemberType ScriptMethod -Name ToXml -Value { '<Event><EventData><Data Name="TargetUserName">bob</Data><Data Name="IpAddress">-</Data><Data Name="LogonType">2</Data><Data Name="SubStatus">0xc000006a</Data></EventData></Event>' }
+            $evt
+        }
+    }
+    $script:Findings = [System.Collections.ArrayList]::new()
+    Invoke-AccountsChecks *> $null
+    Assert-True (@($script:Findings | Where-Object { $_.Title -like "Brute Force:*" }).Count -eq 0 -and
+                 @($script:Findings | Where-Object { $_.Title -eq "Failed Logins (24h): 12 attempts" }).Count -eq 1) "Failed logons without a source IP are not reported as brute force"
+
+    Write-TestHeader "Security Log Access Denied"
+    function Get-WinEvent { throw [System.UnauthorizedAccessException]::new("Attempted to perform an unauthorized operation.") }
+    $script:Findings = [System.Collections.ArrayList]::new()
+    Invoke-AccountsChecks *> $null
+    Assert-True (@($script:Findings | Where-Object { $_.Title -eq "Event Log Access Denied" }).Count -eq 1) "Unreadable Security log is reported instead of silently skipped"
     Remove-Item Function:\Get-LocalUser, Function:\Get-WinEvent, Function:\Get-LocalGroupMember
 
     Write-TestHeader "Baseline Tasks and Exclusions"
@@ -605,6 +644,15 @@ try {
         $niOutput = & $hostExe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$repoRoot\AmIHacked.ps1" -OutputPath $niOutputDir -Offline `
             -SkipModules Processes,Network,Accounts,FileSystem,DefenseEvasion,Baseline 2>&1 | Out-String
         Assert-True ($niOutput -match "---AMIHACKED-SUMMARY-JSON---") "Host started with -NonInteractive auto-enables CI mode"
+
+        Write-TestHeader "Missing -BaselinePath"
+        $bpOutputDir = Join-Path $testTempDir "reports_bp"
+        New-Item -ItemType Directory -Path $bpOutputDir -Force | Out-Null
+        & "$repoRoot\AmIHacked.ps1" -OutputPath $bpOutputDir -Offline -CIMode -ExportJson -BaselinePath (Join-Path $testTempDir "missing.json") `
+            -SkipModules Processes,Network,Accounts,FileSystem,DefenseEvasion *>&1 | Out-Null
+        $bpJson = Get-ChildItem $bpOutputDir -Filter "AmIHacked_*.json" | Select-Object -First 1
+        $bpFindings = if ($bpJson) { (Get-Content $bpJson.FullName -Raw | ConvertFrom-Json).Findings } else { @() }
+        Assert-True (@($bpFindings | Where-Object { $_.Title -eq "Baseline File Not Found" }).Count -eq 1) "A -BaselinePath that does not exist is reported"
 
         Write-TestHeader "CIMode Exit Code"
         if ($ciExit -ge 0 -and $ciExit -le 2) {

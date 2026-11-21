@@ -83,18 +83,19 @@ function Invoke-AccountsChecks {
     Write-Status "Checking local Administrators group membership..."
 
     try {
-        $adminGroup = Get-LocalGroupMember -Group "Administrators" -ErrorAction SilentlyContinue
-
-        $expectedAdmins = @($env:USERNAME, "Administrator")
+        # By SID: the group name is localized, and Microsoft/Entra ID accounts don't match $env:USERNAME
+        $adminGroup = @(Get-LocalGroupMember -SID "S-1-5-32-544" -ErrorAction SilentlyContinue)
+        $currentUserSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 
         foreach ($member in $adminGroup) {
-            $memberName = $member.Name.Split('\')[-1]
+            $memberSid = "$($member.SID)"
+            $isExpected = ($memberSid -eq $currentUserSid) -or ($memberSid -match '-500$')
 
-            if ($memberName -notin $expectedAdmins -and $member.ObjectClass -eq "User") {
+            if (-not $isExpected -and $member.ObjectClass -eq "User") {
                 Add-Finding -Severity "WARNING" -Category "Account" `
                     -Title "Unexpected Admin: $($member.Name)" `
                     -Description "User '$($member.Name)' ($($member.ObjectClass)) is a member of the local Administrators group. Verify this is intentional." `
-                    -Remediation "If unexpected, remove with: Remove-LocalGroupMember -Group 'Administrators' -Member '$($member.Name)'" `
+                    -Remediation "If unexpected, remove with: Remove-LocalGroupMember -SID 'S-1-5-32-544' -Member '$($member.Name)'" `
                     -Details @{
                         Name = $member.Name
                         SID = $member.SID
@@ -119,12 +120,10 @@ function Invoke-AccountsChecks {
     Write-Status "Analyzing failed login attempts..."
 
     try {
-        $failedLogins = Get-WinEvent -FilterHashtable @{
-            LogName = 'Security'
-            Id = 4625
-        } -MaxEvents $maxEvents -ErrorAction SilentlyContinue
+        # -LogName + -FilterXPath: with -FilterHashtable, an unreadable Security log looks like "no events"
+        $failedLogins = Get-WinEventOrEmpty -LogName 'Security' -FilterXPath "*[System[EventID=4625]]" -MaxEvents $maxEvents
 
-        if ($failedLogins) {
+        if ($failedLogins.Count -gt 0) {
             $grouped = $failedLogins | ForEach-Object {
                 $xml = [xml]$_.ToXml()
                 $data = $xml.Event.EventData.Data
@@ -137,7 +136,8 @@ function Invoke-AccountsChecks {
                 }
             }
 
-            $byIP = $grouped | Group-Object SourceIP | Sort-Object Count -Descending
+            # Failures without a source address ("-", local console) are not attributable to a remote attacker
+            $byIP = $grouped | Where-Object { $_.SourceIP -and $_.SourceIP -ne '-' } | Group-Object SourceIP | Sort-Object Count -Descending
 
             foreach ($ipGroup in $byIP) {
                 if ($ipGroup.Count -ge 10) {
@@ -158,7 +158,7 @@ function Invoke-AccountsChecks {
                 }
             }
 
-            $last24h = $failedLogins | Where-Object { $_.TimeCreated -gt (Get-Date).AddHours(-24) }
+            $last24h = @($failedLogins | Where-Object { $_.TimeCreated -gt (Get-Date).AddHours(-24) })
             if ($last24h.Count -gt 0) {
                 Add-Finding -Severity "INFO" -Category "Account" `
                     -Title "Failed Logins (24h): $($last24h.Count) attempts" `
@@ -171,7 +171,7 @@ function Invoke-AccountsChecks {
         Write-Status "Could not read Security event log (requires admin)." -Color Yellow
         Add-Finding -Severity "INFO" -Category "Account" `
             -Title "Event Log Access Denied" `
-            -Description "Cannot read the Security event log for failed login analysis. Re-run as Administrator." `
+            -Description "Cannot read the Security event log, so failed-login and RDP session analysis were skipped. Re-run as Administrator." `
             -Remediation "Run this tool as Administrator to enable event log analysis."
     }
 
@@ -183,7 +183,7 @@ function Invoke-AccountsChecks {
         # Filter LogonType 10 in the query itself: capping 4624 events first would only cover the
         # newest $maxEvents logons of any type (often just a few hours on a busy machine).
         $rdpXPath = "*[System[EventID=4624] and EventData[Data[@Name='LogonType']='10']]"
-        $rdpLogins = @(Get-WinEvent -LogName 'Security' -FilterXPath $rdpXPath -MaxEvents $maxEvents -ErrorAction SilentlyContinue)
+        $rdpLogins = @(Get-WinEventOrEmpty -LogName 'Security' -FilterXPath $rdpXPath -MaxEvents $maxEvents)
 
         if ($rdpLogins.Count -gt 0) {
             $rdpDetails = $rdpLogins | ForEach-Object {

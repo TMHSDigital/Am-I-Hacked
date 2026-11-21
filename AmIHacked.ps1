@@ -197,6 +197,11 @@ if ('Baseline' -notin $SkipModules) {
     } elseif (-not $BaselinePath -and (Test-Path $defaultBaselinePath)) {
         Write-Section "Baseline Comparison"
         Compare-Baseline -BaselinePath $defaultBaselinePath -ExpectedHash $BaselineHash
+    } elseif ($BaselinePath) {
+        Add-Finding -Severity "WARNING" -Category "General" -Title "Baseline File Not Found" `
+            -Description "The baseline given with -BaselinePath does not exist: '$BaselinePath'. No baseline comparison was done." `
+            -Remediation "Check the path, or create a baseline on a known-clean system with: .\AmIHacked.ps1 -CreateBaseline" `
+            -MITRE @("T1565.001")
     } elseif (-not $CreateBaseline) {
         Add-Finding -Severity "INFO" -Category "General" -Title "No Baseline Found" `
             -Description "No baseline snapshot exists for comparison. Run with -CreateBaseline on a known-clean system to enable change detection on future scans." `

@@ -25,6 +25,7 @@ function Invoke-ProcessesChecks {
     Write-Status "Checking signatures... ($($processes.Count) processes)"
 
     $seenProcessPaths = @{}
+    $flaggedPathKeys = @{}
 
     foreach ($proc in $processes) {
         $processCount++
@@ -52,11 +53,10 @@ function Invoke-ProcessesChecks {
         $sig = Get-FileSignature -FilePath $procPath
         if ($sig -and $sig.Status -ne "Valid" -and -not (Test-SignatureUnknown $sig)) {
             $flaggedCount++
+            $flaggedPathKeys[$pathKey] = $true
             $versionInfo = Get-FileVersionInfo -FilePath $procPath
 
-            if (Test-IsTrustedSigner -Signature $sig -VersionInfo $versionInfo) {
-                $severity = "INFO"
-            } elseif ($versionInfo -and (Test-IsTrustedCompany $versionInfo.CompanyName)) {
+            if ($versionInfo -and (Test-IsTrustedCompany $versionInfo.CompanyName)) {
                 $severity = "CRITICAL"
             } elseif (-not $versionInfo -or (-not $versionInfo.CompanyName -and -not $versionInfo.OriginalFilename)) {
                 $severity = "CRITICAL"
@@ -80,7 +80,8 @@ function Invoke-ProcessesChecks {
         }
     }
 
-    foreach ($pathKey in $seenProcessPaths.Keys) {
+    # Duplicate processes of a flagged path count as unsigned too; signed duplicates do not
+    foreach ($pathKey in $flaggedPathKeys.Keys) {
         $count = $seenProcessPaths[$pathKey]
         if ($count -gt 1) {
             $flaggedCount += ($count - 1)
@@ -211,7 +212,7 @@ function Invoke-ProcessesChecks {
                 -MITRE @("T1543.003")
         }
 
-        if ($svcPath -notmatch '^"' -and $svcPath -match ' ' -and $svcPath -notmatch '^[A-Za-z]:\\Windows\\') {
+        if (Test-UnquotedServicePath $svcPath) {
             Add-Finding -Severity "WARNING" -Category "Process" `
                 -Title "Unquoted Service Path: $($svc.Name)" `
                 -Description "Service '$($svc.DisplayName)' has an unquoted path with spaces: '$svcPath'. This is a known privilege escalation vulnerability (unquoted service path)." `

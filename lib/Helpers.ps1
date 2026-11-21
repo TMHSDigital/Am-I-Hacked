@@ -494,6 +494,36 @@ function ConvertFrom-LogClearedXml {
     return [PSCustomObject]@{ Channel = $data.Channel; Account = $account }
 }
 
+function Test-UnquotedServicePath {
+    <#
+        True when a service's executable path is unquoted and contains a space, outside \Windows\.
+        Only the executable part (up to ".exe") is considered, so spaces in arguments don't count.
+    #>
+    param([string]$PathName)
+    if (-not $PathName -or $PathName.TrimStart() -match '^"') { return $false }
+    $exePart = if ($PathName -match '^(.*?\.exe)(\s|$)') { $Matches[1] } else { $PathName }
+    return ($exePart -match ' ' -and $exePart -notmatch '^[A-Za-z]:\\Windows\\')
+}
+
+function Get-WinEventOrEmpty {
+    <#
+        Get-WinEvent that returns @() when no events match, but rethrows real errors (e.g. access
+        denied on the Security log without admin), which -ErrorAction SilentlyContinue would hide.
+    #>
+    param([hashtable]$FilterHashtable, [string]$LogName, [string]$FilterXPath, [int]$MaxEvents)
+    $params = @{ ErrorAction = "Stop" }
+    if ($FilterHashtable) { $params.FilterHashtable = $FilterHashtable }
+    if ($LogName) { $params.LogName = $LogName }
+    if ($FilterXPath) { $params.FilterXPath = $FilterXPath }
+    if ($MaxEvents -gt 0) { $params.MaxEvents = $MaxEvents }
+    try {
+        return @(Get-WinEvent @params)
+    } catch {
+        if ("$($_.FullyQualifiedErrorId)" -like "NoMatchingEventsFound*") { return @() }
+        throw
+    }
+}
+
 function Get-HttpStatusCode {
     <# HTTP status code (int) from an Invoke-RestMethod/Invoke-WebRequest error record, or $null. #>
     param($ErrorRecord)

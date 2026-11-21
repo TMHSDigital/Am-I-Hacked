@@ -575,7 +575,7 @@ function Invoke-FileSystemChecks {
             $wmiScriptConsumers = @(Get-CimInstance -Namespace $ns -ClassName ActiveScriptEventConsumer -ErrorAction Stop)
 
             $nsLabel = if ($ns -eq "root\subscription") { "" } else { " [NON-STANDARD: $ns]" }
-            $nsSeverity = if ($ns -eq "root\subscription") { "CRITICAL" } else { "CRITICAL" }
+            $nsSeverity = "CRITICAL"  # persistence in root\default is as serious as in root\subscription
 
             foreach ($binding in $wmiBindings) {
                 $filterRef = ConvertTo-WmiRefString $binding.Filter

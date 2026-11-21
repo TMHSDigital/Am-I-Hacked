@@ -165,7 +165,8 @@ function Invoke-NetworkChecks {
         if ($trustedPorts -contains $port) { continue }
 
         $isAllInterfaces = ($localAddr -eq "0.0.0.0" -or $localAddr -eq "::")
-        $commonListenPorts = @(80, 443, 135, 139, 445, 3389, 5040, 5985, 5986, 7680, 8080) + @(49664..49680)
+        # 22/5985/5986 are reported by the dedicated SSH/WinRM listener checks below
+        $commonListenPorts = @(22, 80, 443, 135, 139, 445, 3389, 5040, 5985, 5986, 7680, 8080) + @(49664..49680)
 
         if ($isAllInterfaces -and $port -notin $commonListenPorts) {
             $dedupKey = "$port|$procName"
