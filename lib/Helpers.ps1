@@ -501,6 +501,23 @@ function Select-MpExclusion {
     return @($Values | Where-Object { $_ -and "$_" -notmatch '^N/A:' })
 }
 
+function ConvertTo-WmiRefString {
+    <# Formats a binding's Filter/Consumer reference as 'Class.Name="X"' (CIM returns an instance, WMI a path string). #>
+    param($Ref)
+    if ($null -eq $Ref) { return "" }
+    if ($Ref -is [string]) { return $Ref }
+    $class = if ($Ref.CimClass) { $Ref.CimClass.CimClassName } else { $Ref.GetType().Name }
+    return "$class.Name=`"$($Ref.Name)`""
+}
+
+function Get-WmiErrorReason {
+    <# Short reason for a failed CIM query, separating access denied from other errors. #>
+    param($ErrorRecord)
+    $ex = $ErrorRecord.Exception
+    if ("$($ex.NativeErrorCode)" -eq "AccessDenied" -or $ex -is [System.UnauthorizedAccessException]) { return "access denied (run as Administrator)" }
+    return $ex.Message.Trim()
+}
+
 function Test-IsDefaultWmiBinding {
     <# True for the binding Windows ships by default (SCM Event Log Filter -> NTEventLogEventConsumer "SCM Event Log Consumer"). #>
     param([string]$Filter, [string]$Consumer)

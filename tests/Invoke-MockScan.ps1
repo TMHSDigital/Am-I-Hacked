@@ -125,6 +125,13 @@ Assert-True ($filtered.Count -eq 1 -and $filtered[0] -eq "C:\Tools") "Non-admin 
 Write-TestHeader "WMI Default Binding Allowlist"
 Assert-True (Test-IsDefaultWmiBinding '__EventFilter.Name="SCM Event Log Filter"' 'NTEventLogEventConsumer.Name="SCM Event Log Consumer"') "Default SCM Event Log binding is allowlisted"
 Assert-True (-not (Test-IsDefaultWmiBinding '__EventFilter.Name="Updater"' 'CommandLineEventConsumer.Name="Updater"')) "Non-default WMI binding is not allowlisted"
+$cimRef = [PSCustomObject]@{ Name = "SCM Event Log Filter"; CimClass = [PSCustomObject]@{ CimClassName = "__EventFilter" } }
+Assert-True ((ConvertTo-WmiRefString $cimRef) -eq '__EventFilter.Name="SCM Event Log Filter"') "CIM binding reference formats as Class.Name=""X"""
+$liveBindings = @(Get-CimInstance -Namespace root\subscription -ClassName __FilterToConsumerBinding -ErrorAction SilentlyContinue)
+$liveDefault = @($liveBindings | Where-Object { $_.Consumer.Name -eq "SCM Event Log Consumer" })
+if ($liveDefault.Count -gt 0) {
+    Assert-True (Test-IsDefaultWmiBinding (ConvertTo-WmiRefString $liveDefault[0].Filter) (ConvertTo-WmiRefString $liveDefault[0].Consumer)) "Live default SCM binding (via Get-CimInstance) is allowlisted"
+}
 
 Write-TestHeader "Degraded Signature Checks"
 # Simulate Get-AuthenticodeSignature being unavailable: every signature comes back as CheckFailed.

@@ -628,52 +628,55 @@ function Invoke-FileSystemChecks {
 
     foreach ($ns in $wmiNamespaces) {
         try {
-            $wmiBindings = @(Get-WmiObject -Namespace $ns -Class __FilterToConsumerBinding -ErrorAction SilentlyContinue)
-            $wmiCmdConsumers = Get-WmiObject -Namespace $ns -Class CommandLineEventConsumer -ErrorAction SilentlyContinue
-            $wmiScriptConsumers = Get-WmiObject -Namespace $ns -Class ActiveScriptEventConsumer -ErrorAction SilentlyContinue
+            # Get-CimInstance works in Windows PowerShell 5.1 and PowerShell 7 (Get-WmiObject was removed in 6+)
+            $wmiBindings = @(Get-CimInstance -Namespace $ns -ClassName __FilterToConsumerBinding -ErrorAction Stop)
+            $wmiCmdConsumers = @(Get-CimInstance -Namespace $ns -ClassName CommandLineEventConsumer -ErrorAction Stop)
+            $wmiScriptConsumers = @(Get-CimInstance -Namespace $ns -ClassName ActiveScriptEventConsumer -ErrorAction Stop)
 
             $nsLabel = if ($ns -eq "root\subscription") { "" } else { " [NON-STANDARD: $ns]" }
             $nsSeverity = if ($ns -eq "root\subscription") { "CRITICAL" } else { "CRITICAL" }
 
             foreach ($binding in $wmiBindings) {
-                if (Test-IsDefaultWmiBinding -Filter $binding.Filter -Consumer $binding.Consumer) { continue }
-                $filterLit = ([string]$binding.Filter) -replace "'", "''"
-                $consumerLit = ([string]$binding.Consumer) -replace "'", "''"
+                $filterRef = ConvertTo-WmiRefString $binding.Filter
+                $consumerRef = ConvertTo-WmiRefString $binding.Consumer
+                if (Test-IsDefaultWmiBinding -Filter $filterRef -Consumer $consumerRef) { continue }
+                $filterNameLit = ([string]$binding.Filter.Name) -replace "'", "''"
+                $consumerNameLit = ([string]$binding.Consumer.Name) -replace "'", "''"
                 Add-Finding -Severity $nsSeverity -Category "FileSystem" `
                     -Title "WMI Persistence Binding Found$nsLabel" `
-                    -Description "WMI event subscription binding detected in '$ns': Filter='$($binding.Filter)' Consumer='$($binding.Consumer)'. WMI persistence survives reboots and is nearly invisible to standard tools — heavily used by advanced threats." `
-                    -Remediation "Get-WmiObject -Namespace '$ns' -Class __FilterToConsumerBinding | Where-Object { `$_.Filter -eq '$filterLit' -and `$_.Consumer -eq '$consumerLit' } | Remove-WmiObject" `
+                    -Description "WMI event subscription binding detected in '$ns': Filter='$filterRef' Consumer='$consumerRef'. WMI persistence survives reboots and is nearly invisible to standard tools — heavily used by advanced threats." `
+                    -Remediation "Get-CimInstance -Namespace '$ns' -ClassName __FilterToConsumerBinding | Where-Object { `$_.Filter.Name -eq '$filterNameLit' -and `$_.Consumer.Name -eq '$consumerNameLit' } | Remove-CimInstance" `
                     -Details @{
                         Namespace = $ns
-                        Filter = $binding.Filter
-                        Consumer = $binding.Consumer
+                        Filter = $filterRef
+                        Consumer = $consumerRef
                     } `
                     -MITRE @("T1546.003")
             }
 
-            if ($wmiCmdConsumers) {
+            if ($wmiCmdConsumers.Count -gt 0) {
                 foreach ($consumer in $wmiCmdConsumers) {
                     Add-Finding -Severity $nsSeverity -Category "FileSystem" `
                         -Title "WMI CommandLine Consumer: $($consumer.Name)$nsLabel" `
                         -Description "WMI CommandLineEventConsumer '$($consumer.Name)' in '$ns' executes: '$($consumer.CommandLineTemplate)'. This will run automatically when the associated WMI event fires." `
-                        -Remediation "Get-WmiObject -Namespace '$ns' -Class CommandLineEventConsumer -Filter `"Name='$($consumer.Name)'`" | Remove-WmiObject" `
+                        -Remediation "Get-CimInstance -Namespace '$ns' -ClassName CommandLineEventConsumer -Filter `"Name='$($consumer.Name)'`" | Remove-CimInstance" `
                         -Details @{ Namespace = $ns; Name = $consumer.Name; Command = $consumer.CommandLineTemplate } `
                         -MITRE @("T1546.003")
                 }
             }
 
-            if ($wmiScriptConsumers) {
+            if ($wmiScriptConsumers.Count -gt 0) {
                 foreach ($consumer in $wmiScriptConsumers) {
                     Add-Finding -Severity $nsSeverity -Category "FileSystem" `
                         -Title "WMI Script Consumer: $($consumer.Name)$nsLabel" `
                         -Description "WMI ActiveScriptEventConsumer '$($consumer.Name)' in '$ns' runs script code when triggered. This is a fileless persistence mechanism." `
-                        -Remediation "Get-WmiObject -Namespace '$ns' -Class ActiveScriptEventConsumer -Filter `"Name='$($consumer.Name)'`" | Remove-WmiObject" `
+                        -Remediation "Get-CimInstance -Namespace '$ns' -ClassName ActiveScriptEventConsumer -Filter `"Name='$($consumer.Name)'`" | Remove-CimInstance" `
                         -Details @{ Namespace = $ns; Name = $consumer.Name; ScriptingEngine = $consumer.ScriptingEngine } `
                         -MITRE @("T1546.003")
                 }
             }
         } catch {
-            Write-Status "Could not check WMI subscriptions in $ns (may need admin)." -Color Yellow
+            Write-Status "Could not check WMI subscriptions in ${ns}: $(Get-WmiErrorReason $_)" -Color Yellow
         }
     }
 
@@ -681,20 +684,20 @@ function Invoke-FileSystemChecks {
     Write-Status "Enumerating WMI namespaces..."
     try {
         $standardNamespaces = @("subscription","cimv2","default","directory","Microsoft","WMI","SECURITY","RSOP","StandardCimv2","msdtc","Cli","nap","MSPS","SecurityCenter","SecurityCenter2","Interop","Hardware","ServiceModel","aspnet","Policy","HyperVCluster","virtualization","Appv","Intel","HP","MSCluster","MSFS","MicrosoftDfs","AccessLogging","PEH")
-        $allNamespaces = Get-WmiObject -Namespace root -Class __Namespace -ErrorAction SilentlyContinue
+        $allNamespaces = @(Get-CimInstance -Namespace root -ClassName __Namespace -ErrorAction Stop)
         foreach ($nsObj in $allNamespaces) {
             $nsName = $nsObj.Name
             if ($nsName -notin $standardNamespaces) {
                 Add-Finding -Severity "WARNING" -Category "FileSystem" `
                     -Title "Non-Standard WMI Namespace: root\$nsName" `
                     -Description "WMI namespace 'root\$nsName' is not a standard Windows namespace. Attackers create custom namespaces to store payloads and maintain persistence outside normal visibility." `
-                    -Remediation "Investigate contents: Get-WmiObject -Namespace 'root\$nsName' -Class __Namespace -ErrorAction SilentlyContinue" `
+                    -Remediation "Investigate contents: Get-CimInstance -Namespace 'root\$nsName' -ClassName __Namespace -ErrorAction SilentlyContinue" `
                     -Details @{ Namespace = "root\$nsName" } `
                     -MITRE @("T1546.003")
             }
         }
     } catch {
-        Write-Verbose "Could not enumerate WMI namespaces: $_"
+        Write-Status "Could not enumerate WMI namespaces: $(Get-WmiErrorReason $_)" -Color Yellow
     }
 
     # ── 10. Scheduled Tasks Check ────────────────────────────────────────
