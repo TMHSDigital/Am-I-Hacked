@@ -70,6 +70,32 @@ $testTempDir = Join-Path $env:TEMP "AmIHacked_Test_$(Get-Random)"
 New-Item -ItemType Directory -Path $testTempDir -Force | Out-Null
 $script:CleanupActions.Add({ Remove-Item $testTempDir -Recurse -Force -ErrorAction SilentlyContinue }) | Out-Null
 
+# ── Unit tests (no scan needed) ──────────────────────────────────────────────
+
+function Assert-True {
+    param([bool]$Condition, [string]$TestName, [string]$FailDetail = "")
+    if ($Condition) {
+        Write-Host "  [PASS] $TestName" -ForegroundColor Green
+        $script:TestsPassed++
+    } else {
+        Write-Host "  [FAIL] $TestName$(if ($FailDetail) { " — $FailDetail" })" -ForegroundColor Red
+        $script:TestsFailed++
+    }
+}
+
+. "$repoRoot\lib\Helpers.ps1"
+. "$repoRoot\lib\ReportGenerator.ps1"
+
+Write-TestHeader "Report Verdict With One Critical"
+$unitFindings = [System.Collections.ArrayList]::new()
+$unitFindings.Add([PSCustomObject]@{ Severity = "CRITICAL"; Category = "Unit"; Title = "Unit critical"; Description = "d"; Remediation = "r"; Details = $null; MITRE = @("T1059") }) | Out-Null
+$unitFindings.Add([PSCustomObject]@{ Severity = "INFO"; Category = "Unit"; Title = "Unit info"; Description = "d"; Remediation = "r"; Details = $null; MITRE = @("T1059") }) | Out-Null
+$unitReport = Join-Path $testTempDir "unit_report.html"
+Generate-HtmlReport -Findings $unitFindings -SystemInfo @{ ComputerName = "UNIT"; UserName = "unit"; Domain = "unit"; OSVersion = "unit"; OSBuild = "0"; PSVersion = "5.1"; IsAdmin = $false; ScanTime = (Get-Date) } `
+    -OutputFile $unitReport -Duration ([timespan]::FromSeconds(1)) -Version "test" | Out-Null
+$unitHtml = Get-Content $unitReport -Raw
+Assert-True ($unitHtml -match 'data-verdict="COMPROMISED" data-critical="1"') "Single CRITICAL finding yields COMPROMISED verdict and count 1" "report verdict banner: $([regex]::Match($unitHtml, 'data-verdict="[^"]*" data-critical="[^"]*"').Value)"
+
 # 1. Double-extension file in temp
 Write-TestHeader "Double Extension File"
 $doubleExtFile = Join-Path $testTempDir "invoice.pdf.exe"
@@ -213,6 +239,20 @@ if (-not $jsonFiles) {
             $script:TestsPassed++
         } else {
             Write-Host "  [FAIL] HTML report missing expected elements" -ForegroundColor Red
+            $script:TestsFailed++
+        }
+
+        # Report counts must match the JSON findings
+        Write-TestHeader "HTML Report Counts"
+        $jsonCrit = @($findings | Where-Object { $_.Severity -eq "CRITICAL" }).Count
+        $jsonWarn = @($findings | Where-Object { $_.Severity -eq "WARNING" }).Count
+        $expectedVerdict = if ($jsonCrit -gt 0) { "COMPROMISED" } elseif ($jsonWarn -gt 3) { "SUSPICIOUS" } elseif ($jsonWarn -gt 0) { "CAUTION" } else { "CLEAN" }
+        if ($htmlContent -match 'data-verdict="(\w+)" data-critical="(\d+)" data-warning="(\d+)"' -and
+            $Matches[1] -eq $expectedVerdict -and [int]$Matches[2] -eq $jsonCrit -and [int]$Matches[3] -eq $jsonWarn) {
+            Write-Host "  [PASS] HTML verdict $expectedVerdict and counts match JSON ($jsonCrit critical, $jsonWarn warning)" -ForegroundColor Green
+            $script:TestsPassed++
+        } else {
+            Write-Host "  [FAIL] HTML verdict/counts do not match JSON (expected $expectedVerdict, $jsonCrit critical, $jsonWarn warning)" -ForegroundColor Red
             $script:TestsFailed++
         }
     } else {

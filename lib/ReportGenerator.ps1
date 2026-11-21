@@ -13,9 +13,9 @@ function Generate-HtmlReport {
         [int]$SuppressedCount = 0
     )
 
-    $critCount = ($Findings | Where-Object { $_.Severity -eq "CRITICAL" }).Count
-    $warnCount = ($Findings | Where-Object { $_.Severity -eq "WARNING" }).Count
-    $infoCount = ($Findings | Where-Object { $_.Severity -eq "INFO" }).Count
+    $critCount = @($Findings | Where-Object { $_.Severity -eq "CRITICAL" }).Count
+    $warnCount = @($Findings | Where-Object { $_.Severity -eq "WARNING" }).Count
+    $infoCount = @($Findings | Where-Object { $_.Severity -eq "INFO" }).Count
     $totalCount = $Findings.Count
 
     # Score weights: CRITICAL=-25, WARNING=-5, INFO=-0.5; result clamped to [0,100] (4+ criticals always score 0)
@@ -59,9 +59,9 @@ function Generate-HtmlReport {
 
     $findingsHtml = ""
     foreach ($cat in $categories) {
-        $catCrit = ($cat.Group | Where-Object { $_.Severity -eq "CRITICAL" }).Count
-        $catWarn = ($cat.Group | Where-Object { $_.Severity -eq "WARNING" }).Count
-        $catInfo = ($cat.Group | Where-Object { $_.Severity -eq "INFO" }).Count
+        $catCrit = @($cat.Group | Where-Object { $_.Severity -eq "CRITICAL" }).Count
+        $catWarn = @($cat.Group | Where-Object { $_.Severity -eq "WARNING" }).Count
+        $catInfo = @($cat.Group | Where-Object { $_.Severity -eq "INFO" }).Count
 
         $catDisplayName = switch ($cat.Name) {
             "Process"         { "Process &amp; Service Analysis" }
@@ -157,9 +157,9 @@ function Generate-HtmlReport {
         $maxCatCount = ($categories | ForEach-Object { $_.Count } | Measure-Object -Maximum).Maximum
         $chartRows = ""
         foreach ($cat in $categories) {
-            $catCritC  = ($cat.Group | Where-Object { $_.Severity -eq "CRITICAL" }).Count
-            $catWarnC  = ($cat.Group | Where-Object { $_.Severity -eq "WARNING"  }).Count
-            $catInfoC  = ($cat.Group | Where-Object { $_.Severity -eq "INFO"     }).Count
+            $catCritC  = @($cat.Group | Where-Object { $_.Severity -eq "CRITICAL" }).Count
+            $catWarnC  = @($cat.Group | Where-Object { $_.Severity -eq "WARNING"  }).Count
+            $catInfoC  = @($cat.Group | Where-Object { $_.Severity -eq "INFO"     }).Count
             $catTotalC = $cat.Count
 
             $catChartName = switch ($cat.Name) {
@@ -739,7 +739,7 @@ function Generate-HtmlReport {
             </div>
         </div>
 
-        <div class="verdict-banner">
+        <div class="verdict-banner" data-verdict="${verdict}" data-critical="${critCount}" data-warning="${warnCount}" data-info="${infoCount}">
             <div class="verdict-icon icon-${verdictIcon}">$(switch ($verdictIcon) { "check" { "&#x2713;" } "warning" { "!" } "critical" { "&#x2715;" } })</div>
             <div class="verdict-label">${verdict}</div>
             <div class="verdict-message">${verdictMessage}</div>
