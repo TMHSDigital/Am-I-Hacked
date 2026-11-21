@@ -113,6 +113,36 @@ try {
     $script:RedactMode = $false
     $script:RedactMap = @{}
 
+    Write-TestHeader "Config Defaults"
+    function ConvertTo-NormalizedValue {
+        param($Value)
+        if ($null -eq $Value) { return "" }
+        if ($Value -is [string] -or $Value -is [ValueType]) { return "$Value" }
+        if ($Value -is [System.Collections.IDictionary]) {
+            return "{" + (($Value.Keys | Sort-Object | ForEach-Object { "$_=$(ConvertTo-NormalizedValue $Value[$_])" }) -join ";") + "}"
+        }
+        if ($Value -is [System.Collections.IEnumerable]) {
+            return "[" + ((@($Value) | ForEach-Object { ConvertTo-NormalizedValue $_ }) -join "|") + "]"
+        }
+        return "{" + (($Value.PSObject.Properties | Sort-Object Name | ForEach-Object { "$($_.Name)=$(ConvertTo-NormalizedValue $_.Value)" }) -join ";") + "}"
+    }
+    $defaultCfg = Get-DefaultConfig
+    $exampleCfg = Get-Content "$repoRoot\config\config.example.json" -Raw | ConvertFrom-Json
+    $defaultKeys = @($defaultCfg.PSObject.Properties.Name | Sort-Object)
+    $exampleKeys = @($exampleCfg.PSObject.Properties.Name | Sort-Object)
+    $keyDiff = @(Compare-Object $defaultKeys $exampleKeys | ForEach-Object { "$($_.InputObject)$($_.SideIndicator)" })
+    Assert-True ($keyDiff.Count -eq 0) "config.example.json has the same keys as Get-DefaultConfig" ($keyDiff -join ", ")
+    # Intentional differences: the example suggests common app folders (TrustedAppDirs) and shows sample
+    # Suppressions; the built-in defaults skip no app folders and suppress nothing.
+    $valueDiff = @($defaultKeys | Where-Object { $_ -notin @("TrustedAppDirs", "Suppressions") -and $_ -in $exampleKeys -and
+        (ConvertTo-NormalizedValue $defaultCfg.$_) -ne (ConvertTo-NormalizedValue $exampleCfg.$_) })
+    Assert-True ($valueDiff.Count -eq 0) "config.example.json values match Get-DefaultConfig" ($valueDiff -join ", ")
+    $oldUserCfg = [PSCustomObject]@{ TrustedIPs = @("10.9.9.9"); AccountMaxAgeDays = 14 }
+    $mergedCfg = Merge-Config -Defaults $defaultCfg -UserConfig $oldUserCfg
+    Assert-True ($mergedCfg.AccountMaxAgeDays -eq 14 -and @($mergedCfg.TrustedIPs).Count -eq 1 -and @($mergedCfg.BackdoorPorts).Count -gt 0 -and $mergedCfg.MaxVTLookups -eq $defaultCfg.MaxVTLookups) "Older config files get defaults for keys they lack"
+    $fallbackLines = @(Get-ChildItem "$repoRoot\modules" -Filter "Check-*.ps1" | Select-String -Pattern 'if \(\$script:Config\.\w+\) \{[^}]*\} else \{')
+    Assert-True ($fallbackLines.Count -eq 0) "No module contains literal fallback values for config keys" (($fallbackLines | ForEach-Object { "$($_.Filename):$($_.LineNumber)" }) -join ", ")
+
     Write-TestHeader "Outbound Port Classification"
     $script:Config = Get-DefaultConfig
     Assert-True (-not (Test-IsUncommonRemotePort 443) -and -not (Test-IsUncommonRemotePort 80) -and -not (Test-IsUncommonRemotePort 53)) "Outbound 443/80/53 are not uncommon ports"

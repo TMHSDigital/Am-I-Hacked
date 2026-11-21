@@ -10,6 +10,35 @@ $script:ModuleTotal = 0
 $script:SectionStart = $null
 $script:IsAdmin = $false
 
+# Shared constants (single source for every module and the baseline code)
+$script:RunKeyPaths = @(
+    "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run",
+    "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce",
+    "HKLM:\Software\Microsoft\Windows\CurrentVersion\Run",
+    "HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce"
+)
+
+$script:CategoryDisplayNames = @{
+    "Process"        = "Process &amp; Service Analysis"
+    "Network"        = "Network Indicators"
+    "Account"        = "Account &amp; Authentication"
+    "FileSystem"     = "File System Red Flags"
+    "DefenseEvasion" = "Defense Evasion &amp; Anti-Forensics"
+    "Baseline"       = "Baseline Comparison"
+}
+
+function Get-SeverityCounts {
+    <# CRITICAL/WARNING/INFO counts for a list of findings (always arrays, so a single match counts as 1 in PS 5.1). #>
+    param([object[]]$Findings)
+    $list = @($Findings | Where-Object { $_ })
+    return [PSCustomObject]@{
+        Critical = @($list | Where-Object { $_.Severity -eq "CRITICAL" }).Count
+        Warning  = @($list | Where-Object { $_.Severity -eq "WARNING" }).Count
+        Info     = @($list | Where-Object { $_.Severity -eq "INFO" }).Count
+        Total    = $list.Count
+    }
+}
+
 function Write-Banner {
     Write-Host ""
     $lines = @(
@@ -75,9 +104,10 @@ function Write-Section {
         $fc = $script:Findings.Count
         $tally = ""
         if ($fc -gt 0) {
-            $cc = @($script:Findings | Where-Object { $_.Severity -eq "CRITICAL" }).Count
-            $wc = @($script:Findings | Where-Object { $_.Severity -eq "WARNING" }).Count
-            $ic = $fc - $cc - $wc
+            $sevCounts = Get-SeverityCounts $script:Findings
+            $cc = $sevCounts.Critical
+            $wc = $sevCounts.Warning
+            $ic = $sevCounts.Info
             $parts = @()
             if ($cc -gt 0) { $parts += "${cc}C" }
             if ($wc -gt 0) { $parts += "${wc}W" }
@@ -323,6 +353,25 @@ function Get-DefaultConfig {
     }
 }
 
+function Merge-Config {
+    <#
+        Overlays the properties of a user config (from config.json) onto the built-in defaults, so a
+        config file written for an older version still gets defaults for keys added later.
+        A key present in the user file replaces the default value entirely (including empty arrays).
+    #>
+    param($Defaults, $UserConfig)
+    $merged = [PSCustomObject]@{}
+    foreach ($prop in $Defaults.PSObject.Properties) {
+        $merged | Add-Member -NotePropertyName $prop.Name -NotePropertyValue $prop.Value
+    }
+    if ($UserConfig) {
+        foreach ($prop in $UserConfig.PSObject.Properties) {
+            $merged | Add-Member -NotePropertyName $prop.Name -NotePropertyValue $prop.Value -Force
+        }
+    }
+    return $merged
+}
+
 function New-DefaultConfig {
     param([string]$Path = "")
     if (-not $Path) {
@@ -346,8 +395,7 @@ function Test-IsUncommonRemotePort {
     # Outbound connections to a well-known port below 1024 that is not in CommonRemotePorts.
     # TrustedPorts is for listeners only and is deliberately not consulted here.
     param([int]$Port)
-    $common = if ($script:Config.CommonRemotePorts) { $script:Config.CommonRemotePorts } else { @(80, 443, 53, 22, 993, 995, 587, 465, 853) }
-    return ($Port -lt 1024 -and $Port -notin $common)
+    return ($Port -lt 1024 -and $Port -notin @($script:Config.CommonRemotePorts))
 }
 
 function Test-IsTrustedIP {
@@ -692,12 +740,7 @@ function Export-Baseline {
             )
 
             RunKeys = @(
-                @(
-                    "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run",
-                    "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce",
-                    "HKLM:\Software\Microsoft\Windows\CurrentVersion\Run",
-                    "HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce"
-                ) | ForEach-Object {
+                $script:RunKeyPaths | ForEach-Object {
                     $key = $_
                     try {
                         $entries = Get-ItemProperty $key -ErrorAction SilentlyContinue
@@ -807,13 +850,7 @@ function Compare-Baseline {
         }
 
         $oldRunEntries = $old.RunKeys | ForEach-Object { "$($_.Key)\$($_.Name)" }
-        $runKeyPaths = @(
-            "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run",
-            "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce",
-            "HKLM:\Software\Microsoft\Windows\CurrentVersion\Run",
-            "HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce"
-        )
-        foreach ($keyPath in $runKeyPaths) {
+        foreach ($keyPath in $script:RunKeyPaths) {
             try {
                 $entries = Get-ItemProperty $keyPath -ErrorAction SilentlyContinue
                 if (-not $entries) { continue }

@@ -7,12 +7,8 @@ Author: Am I Hacked Project
 
 function Invoke-FileSystemChecks {
 
-    $maxAgeDays = if ($script:Config.FileSystemMaxAgeDays) { $script:Config.FileSystemMaxAgeDays } else { 3 }
-    $suspiciousExtensions = if ($script:Config.SuspiciousTempExtensions) {
-        $script:Config.SuspiciousTempExtensions
-    } else {
-        @(".exe", ".dll", ".scr", ".bat", ".cmd", ".vbs", ".ps1", ".hta")
-    }
+    $maxAgeDays = $script:Config.FileSystemMaxAgeDays
+    $suspiciousExtensions = @($script:Config.SuspiciousTempExtensions)
 
     # ── 1. Recently Modified System Executables ──────────────────────────
 
@@ -205,7 +201,7 @@ function Invoke-FileSystemChecks {
         Write-Status "Checking file hashes against VirusTotal..."
 
         $checked = 0
-        $maxVT = if ($script:Config.MaxVTLookups) { [int]$script:Config.MaxVTLookups } else { 4 }
+        $maxVT = [int]$script:Config.MaxVTLookups
 
         foreach ($file in $vtCandidates) {
             if ($checked -ge $maxVT) {
@@ -396,14 +392,7 @@ function Invoke-FileSystemChecks {
 
     Write-Status "Checking common persistence/autorun locations..."
 
-    $runKeys = @(
-        "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run",
-        "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce",
-        "HKLM:\Software\Microsoft\Windows\CurrentVersion\Run",
-        "HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce"
-    )
-
-    foreach ($key in $runKeys) {
+    foreach ($key in $script:RunKeyPaths) {
         try {
             $entries = Get-ItemProperty $key -ErrorAction SilentlyContinue
             if (-not $entries) { continue }

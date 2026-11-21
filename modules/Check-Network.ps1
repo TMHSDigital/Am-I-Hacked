@@ -94,7 +94,7 @@ function Invoke-NetworkChecks {
         Write-Status "Checking external IPs against AbuseIPDB..."
 
         $checkedCount = 0
-        $maxChecks = if ($script:Config.AbuseIPDBMaxChecks) { [int]$script:Config.AbuseIPDBMaxChecks } else { 30 }
+        $maxChecks = [int]$script:Config.AbuseIPDBMaxChecks
 
         foreach ($ip in $externalIPs.Keys) {
             if ($checkedCount -ge $maxChecks) {
@@ -186,7 +186,7 @@ function Invoke-NetworkChecks {
     foreach ($key in $seenListeners.Keys) {
         $entry = $seenListeners[$key]
         $severity = "WARNING"
-        $backdoorPorts = if ($script:Config.BackdoorPorts) { $script:Config.BackdoorPorts } else { @(4444, 5555, 6666, 1234, 31337, 12345, 54321, 9999, 1337) }
+        $backdoorPorts = @($script:Config.BackdoorPorts)
         if ($entry.Port -in $backdoorPorts) { $severity = "CRITICAL" }
         $addrStr = ($entry.Addresses | Sort-Object -Unique) -join ", "
 
@@ -239,7 +239,7 @@ function Invoke-NetworkChecks {
     $adapters = Get-DnsClientServerAddress -ErrorAction SilentlyContinue |
         Where-Object { $_.ServerAddresses.Count -gt 0 }
 
-    $knownDNS = if ($script:Config.KnownDNSServers) { $script:Config.KnownDNSServers } else { @("8.8.8.8","8.8.4.4","1.1.1.1","1.0.0.1","9.9.9.9","149.112.112.112","208.67.222.222","208.67.220.220","76.76.2.0","76.76.10.0") }
+    $knownDNS = @($script:Config.KnownDNSServers)
 
     $seenDns = @{}
     foreach ($adapter in $adapters) {

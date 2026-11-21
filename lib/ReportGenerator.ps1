@@ -13,10 +13,11 @@ function Generate-HtmlReport {
         [int]$SuppressedCount = 0
     )
 
-    $critCount = @($Findings | Where-Object { $_.Severity -eq "CRITICAL" }).Count
-    $warnCount = @($Findings | Where-Object { $_.Severity -eq "WARNING" }).Count
-    $infoCount = @($Findings | Where-Object { $_.Severity -eq "INFO" }).Count
-    $totalCount = $Findings.Count
+    $sevCounts = Get-SeverityCounts $Findings
+    $critCount = $sevCounts.Critical
+    $warnCount = $sevCounts.Warning
+    $infoCount = $sevCounts.Info
+    $totalCount = $sevCounts.Total
 
     # Score weights: CRITICAL=-25, WARNING=-5, INFO=-0.5; result clamped to [0,100] (4+ criticals always score 0)
     $penalty = ($critCount * 25) + ($warnCount * 5) + ($infoCount * 0.5)
@@ -59,19 +60,12 @@ function Generate-HtmlReport {
 
     $findingsHtml = ""
     foreach ($cat in $categories) {
-        $catCrit = @($cat.Group | Where-Object { $_.Severity -eq "CRITICAL" }).Count
-        $catWarn = @($cat.Group | Where-Object { $_.Severity -eq "WARNING" }).Count
-        $catInfo = @($cat.Group | Where-Object { $_.Severity -eq "INFO" }).Count
+        $catCounts = Get-SeverityCounts $cat.Group
+        $catCrit = $catCounts.Critical
+        $catWarn = $catCounts.Warning
+        $catInfo = $catCounts.Info
 
-        $catDisplayName = switch ($cat.Name) {
-            "Process"         { "Process &amp; Service Analysis" }
-            "Network"         { "Network Indicators" }
-            "Account"         { "Account &amp; Authentication" }
-            "FileSystem"      { "File System Red Flags" }
-            "DefenseEvasion"  { "Defense Evasion &amp; Anti-Forensics" }
-            "Baseline"        { "Baseline Comparison" }
-            default           { $cat.Name }
-        }
+        $catDisplayName = if ($script:CategoryDisplayNames.ContainsKey($cat.Name)) { $script:CategoryDisplayNames[$cat.Name] } else { $cat.Name }
 
         $findingsHtml += @"
         <div class="category-section">
@@ -157,20 +151,13 @@ function Generate-HtmlReport {
         $maxCatCount = ($categories | ForEach-Object { $_.Count } | Measure-Object -Maximum).Maximum
         $chartRows = ""
         foreach ($cat in $categories) {
-            $catCritC  = @($cat.Group | Where-Object { $_.Severity -eq "CRITICAL" }).Count
-            $catWarnC  = @($cat.Group | Where-Object { $_.Severity -eq "WARNING"  }).Count
-            $catInfoC  = @($cat.Group | Where-Object { $_.Severity -eq "INFO"     }).Count
+            $catCountsC = Get-SeverityCounts $cat.Group
+            $catCritC  = $catCountsC.Critical
+            $catWarnC  = $catCountsC.Warning
+            $catInfoC  = $catCountsC.Info
             $catTotalC = $cat.Count
 
-            $catChartName = switch ($cat.Name) {
-                "Process"        { "Process &amp; Service Analysis" }
-                "Network"        { "Network Indicators" }
-                "Account"        { "Account &amp; Authentication" }
-                "FileSystem"     { "File System Red Flags" }
-                "DefenseEvasion" { "Defense Evasion &amp; Anti-Forensics" }
-                "Baseline"       { "Baseline Comparison" }
-                default          { $cat.Name }
-            }
+            $catChartName = if ($script:CategoryDisplayNames.ContainsKey($cat.Name)) { $script:CategoryDisplayNames[$cat.Name] } else { $cat.Name }
 
             $critPct = if ($maxCatCount -gt 0) { [math]::Round(($catCritC / $maxCatCount) * 100, 1) } else { 0 }
             $warnPct = if ($maxCatCount -gt 0) { [math]::Round(($catWarnC / $maxCatCount) * 100, 1) } else { 0 }

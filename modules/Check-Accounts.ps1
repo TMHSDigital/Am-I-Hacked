@@ -7,8 +7,8 @@ Author: Am I Hacked Project
 
 function Invoke-AccountsChecks {
 
-    $maxAgeDays = if ($script:Config.AccountMaxAgeDays) { $script:Config.AccountMaxAgeDays } else { 7 }
-    $maxEvents = if ($script:Config.MaxEventLogEntries) { $script:Config.MaxEventLogEntries } else { 1000 }
+    $maxAgeDays = $script:Config.AccountMaxAgeDays
+    $maxEvents = $script:Config.MaxEventLogEntries
 
     # ── 1. Local Account Enumeration ─────────────────────────────────────
 

@@ -105,15 +105,14 @@ if ($script:RedactMode) {
 
 # ── Load Config (silent — summary printed after banner) ──────────────────────
 
+$script:Config = Get-DefaultConfig
 if (Test-Path $ConfigPath) {
     try {
-        $script:Config = Get-Content $ConfigPath -Raw | ConvertFrom-Json
+        $script:Config = Merge-Config -Defaults $script:Config -UserConfig (Get-Content $ConfigPath -Raw | ConvertFrom-Json)
     } catch {
         Write-Warning (Invoke-Redact "Failed to parse config at '$ConfigPath': $_. Using built-in defaults.")
         $script:Config = Get-DefaultConfig
     }
-} else {
-    $script:Config = Get-DefaultConfig
 }
 
 # ── Admin Check ──────────────────────────────────────────────────────────────
@@ -314,10 +313,11 @@ if ($CreateBaseline) {
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 
-$critCount = @($script:Findings | Where-Object { $_.Severity -eq "CRITICAL" }).Count
-$warnCount = @($script:Findings | Where-Object { $_.Severity -eq "WARNING" }).Count
-$infoCount = @($script:Findings | Where-Object { $_.Severity -eq "INFO" }).Count
-$totalCount = $script:Findings.Count
+$sevCounts = Get-SeverityCounts $script:Findings
+$critCount = $sevCounts.Critical
+$warnCount = $sevCounts.Warning
+$infoCount = $sevCounts.Info
+$totalCount = $sevCounts.Total
 
 $verdict = "CLEAN"
 $verdictColor = "Green"
