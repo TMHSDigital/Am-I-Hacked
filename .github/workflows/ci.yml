@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    name: BOM, parse and PSScriptAnalyzer
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: BOM and parse check (Windows PowerShell 5.1)
+        shell: powershell
+        run: .\tests\Invoke-StaticChecks.ps1; exit $LASTEXITCODE
+
+      - name: BOM, parse and PSScriptAnalyzer (PowerShell 7)
+        shell: pwsh
+        run: .\tests\Invoke-StaticChecks.ps1 -Analyzer; exit $LASTEXITCODE
+
+  harness:
+    name: Mock scan harness (Windows PowerShell 5.1)
+    runs-on: windows-latest
+    needs: static
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Run harness
+        shell: powershell
+        run: .\tests\Invoke-MockScan.ps1; exit $LASTEXITCODE

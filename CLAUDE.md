@@ -40,7 +40,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Copy-Item config/config.example.json config/config.json
 ```
 
-There is no formal CI system — testing is done manually via the mock scan harness.
+CI (`.github/workflows/ci.yml`) runs `tests/Invoke-StaticChecks.ps1` (BOM + parse under PS 5.1 and 7, PSScriptAnalyzer errors under PS 7) and the mock scan harness under PS 5.1 on every push and pull request. Run the same locally with `.\tests\Invoke-StaticChecks.ps1 -Analyzer` and `.\tests\Invoke-MockScan.ps1`.
 
 ## Architecture
 
