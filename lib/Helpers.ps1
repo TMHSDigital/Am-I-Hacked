@@ -420,6 +420,14 @@ function Get-FileSignature {
     return [PSCustomObject]@{ Status = "CheckFailed"; StatusMessage = "Signature check unavailable (PS.Security module could not be loaded)." }
 }
 
+function Get-MaxSeverity {
+    <# Returns the more severe of two severities (INFO < WARNING < CRITICAL), so later rules can only raise severity. #>
+    param([string]$Current, [string]$New)
+    $rank = @{ "INFO" = 0; "WARNING" = 1; "CRITICAL" = 2 }
+    if ($rank[$New] -gt $rank[$Current]) { return $New }
+    return $Current
+}
+
 function Select-MpExclusion {
     <# Drops the "N/A: Must be an administrator to view exclusions" placeholder Defender returns to non-admin callers. #>
     param([object[]]$Values)

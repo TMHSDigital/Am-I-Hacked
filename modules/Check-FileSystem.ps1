@@ -420,19 +420,19 @@ function Invoke-FileSystemChecks {
                 $suspicious = $false
 
                 if ($value -match "\\Temp\\" -or $value -match "\\AppData\\Local\\Temp") {
-                    $severity = "CRITICAL"
+                    $severity = Get-MaxSeverity $severity "CRITICAL"
                     $suspicious = $true
                 }
                 if ($value -match "powershell.*-enc" -or $value -match "powershell.*-e " -or $value -match "-WindowStyle\s+Hidden") {
-                    $severity = "CRITICAL"
+                    $severity = Get-MaxSeverity $severity "CRITICAL"
                     $suspicious = $true
                 }
                 if ($value -match "mshta|wscript|cscript|regsvr32|rundll32.*javascript") {
-                    $severity = "WARNING"
+                    $severity = Get-MaxSeverity $severity "WARNING"
                     $suspicious = $true
                 }
                 if ($value -match "\^|``|%[a-z]") {
-                    $severity = "WARNING"
+                    $severity = Get-MaxSeverity $severity "WARNING"
                     $suspicious = $true
                 }
 
@@ -737,17 +737,17 @@ function Invoke-FileSystemChecks {
 
                     if ($execute -match "\\Temp\\" -or $execute -match "\\AppData\\") {
                         $suspicious = $true
-                        $severity = "WARNING"
+                        $severity = Get-MaxSeverity $severity "WARNING"
                     }
 
                     if ($execute -match "powershell" -and $taskArgs -match "-enc|-e |-WindowStyle\s+Hidden") {
                         $suspicious = $true
-                        $severity = "CRITICAL"
+                        $severity = Get-MaxSeverity $severity "CRITICAL"
                     }
 
                     if ($execute -match "mshta|wscript|cscript|certutil|bitsadmin") {
                         $suspicious = $true
-                        $severity = "WARNING"
+                        $severity = Get-MaxSeverity $severity "WARNING"
                     }
 
                     if ($suspicious) {

@@ -102,6 +102,9 @@ Assert-True (-not (Test-IsUncommonRemotePort 443) -and -not (Test-IsUncommonRemo
 Assert-True (Test-IsUncommonRemotePort 23) "Outbound port 23 is an uncommon port"
 $script:Config = @{}
 
+Write-TestHeader "Severity Escalation"
+Assert-True ((Get-MaxSeverity "CRITICAL" "WARNING") -eq "CRITICAL" -and (Get-MaxSeverity "INFO" "WARNING") -eq "WARNING" -and (Get-MaxSeverity "WARNING" "CRITICAL") -eq "CRITICAL") "Get-MaxSeverity only ever raises severity"
+
 Write-TestHeader "Defender Exclusion Placeholder"
 $filtered = @(Select-MpExclusion @("N/A: Must be an administrator to view exclusions", "C:\Tools"))
 Assert-True ($filtered.Count -eq 1 -and $filtered[0] -eq "C:\Tools") "Non-admin 'N/A:' placeholder is dropped, real exclusions kept"
@@ -152,6 +155,16 @@ try {
     Write-Host "  [SKIP] Could not create Run key: $_" -ForegroundColor Yellow
 }
 
+# 4. Autorun matching both a CRITICAL rule (Temp path) and a WARNING rule (wscript)
+$testRunKeyName2 = "AmIHackedTestMixed_$(Get-Random)"
+try {
+    Set-ItemProperty -Path $testRunKeyPath -Name $testRunKeyName2 -Value 'wscript.exe C:\Users\Public\AppData\Local\Temp\a.vbs' -ErrorAction Stop
+    $script:CleanupActions.Add({ Remove-ItemProperty -Path $testRunKeyPath -Name $testRunKeyName2 -ErrorAction SilentlyContinue }) | Out-Null
+    Write-Host "  [SETUP] Created Run key: $testRunKeyName2"
+} catch {
+    Write-Host "  [SKIP] Could not create Run key: $_" -ForegroundColor Yellow
+}
+
 # ── Run the scan ─────────────────────────────────────────────────────────────
 
 Write-Host "`n  Running AmIHacked.ps1 -ExportJson -Offline -CreateBaseline..." -ForegroundColor White
@@ -182,6 +195,9 @@ if (-not $jsonFiles) {
 
     # Validate expected detections
     Assert-FindingExists -Findings $findings -TitlePattern "Suspicious Autorun:.*$testRunKeyName" -TestName "Detected suspicious autorun with encoded PS"
+
+    $mixedAutorun = @($findings | Where-Object { $_.Title -eq "Suspicious Autorun: $testRunKeyName2" })
+    Assert-True ($mixedAutorun.Count -eq 1 -and $mixedAutorun[0].Severity -eq "CRITICAL") "Autorun matching CRITICAL and WARNING rules stays CRITICAL" "got: $(($mixedAutorun | Select-Object -ExpandProperty Severity) -join ',')"
 
     Assert-FindingExists -Findings $findings -TitlePattern "Stealer Output File.*passwords" -TestName "Detected stealer output file pattern"
 
