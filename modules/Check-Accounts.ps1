@@ -208,45 +208,7 @@ function Invoke-AccountsChecks {
         Write-Verbose "Could not read RDP session history: $_"
     }
 
-    # ── 5. Event Log Clearing Detection ──────────────────────────────────
-
-    Write-Status "Checking for event log clearing..."
-
-    try {
-        $logClears = Get-WinEvent -FilterHashtable @{ LogName='Security'; Id=1102 } -MaxEvents 10 -ErrorAction SilentlyContinue
-        if ($logClears) {
-            foreach ($evt in $logClears) {
-                $daysAgo = ((Get-Date) - $evt.TimeCreated).TotalDays
-                $severity = if ($daysAgo -le 30) { "CRITICAL" } else { "WARNING" }
-
-                Add-Finding -Severity $severity -Category "Account" `
-                    -Title "Security Log Cleared: $($evt.TimeCreated.ToString('yyyy-MM-dd HH:mm'))" `
-                    -Description "The Security event log was cleared on $($evt.TimeCreated). Account: $($evt.Properties[1].Value). Attackers clear logs to cover their tracks." `
-                    -Remediation "Investigate what happened around this time. Check other log sources for correlated activity." `
-                    -Details @{
-                        TimeCleared = $evt.TimeCreated
-                        Account = $evt.Properties[1].Value
-                        DaysAgo = [math]::Round($daysAgo, 1)
-                    } `
-                    -MITRE @("T1070.001")
-            }
-        }
-
-        $sysClears = Get-WinEvent -FilterHashtable @{ LogName='System'; Id=104 } -MaxEvents 10 -ErrorAction SilentlyContinue
-        if ($sysClears) {
-            foreach ($evt in $sysClears) {
-                Add-Finding -Severity "WARNING" -Category "Account" `
-                    -Title "System Log Cleared: $($evt.TimeCreated.ToString('yyyy-MM-dd'))" `
-                    -Description "The System event log was cleared on $($evt.TimeCreated)." `
-                    -Remediation "Investigate why this log was cleared." `
-                    -MITRE @("T1070.001")
-            }
-        }
-    } catch {
-        Write-Verbose "Could not check event log clearing events: $_"
-    }
-
-    # ── 6. Credential Dumping Artifacts ──────────────────────────────────
+    # ── 5. Credential Dumping Artifacts ──────────────────────────────────
 
     Write-Status "Checking for credential dumping artifacts..."
 
@@ -306,7 +268,7 @@ function Invoke-AccountsChecks {
         }
     }
 
-    # ── 7. Credential Guard & LSA Protection Status ──────────────────────
+    # ── 6. Credential Guard & LSA Protection Status ──────────────────────
 
     Write-Status "Checking credential protection status..."
 

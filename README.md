@@ -162,7 +162,7 @@ Non-interactive environments (e.g. piped through `powershell.exe -NonInteractive
 </tr>
 <tr>
 <td><strong>Account & Authentication</strong></td>
-<td>Recently created & hidden accounts ($ suffix), admin group audit, brute force detection (Event 4625), RDP session history, event log clearing (1102/104), credential dumping artifacts (LSASS/SAM), LSA protection status</td>
+<td>Recently created & hidden accounts ($ suffix), admin group audit, brute force detection (Event 4625), RDP session history, credential dumping artifacts (LSASS/SAM), LSA protection status</td>
 </tr>
 <tr>
 <td><strong>File System Red Flags</strong></td>

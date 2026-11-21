@@ -102,6 +102,13 @@ Assert-True (-not (Test-IsUncommonRemotePort 443) -and -not (Test-IsUncommonRemo
 Assert-True (Test-IsUncommonRemotePort 23) "Outbound port 23 is an uncommon port"
 $script:Config = @{}
 
+Write-TestHeader "Event Log Clear Parsing"
+$xml104 = '<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><EventID>104</EventID></System><UserData><LogFileCleared xmlns="http://manifests.microsoft.com/win/2004/08/windows/eventlog"><SubjectUserName>alice</SubjectUserName><SubjectDomainName>CONTOSO</SubjectDomainName><Channel>System</Channel><BackupPath></BackupPath></LogFileCleared></UserData></Event>'
+$info104 = ConvertFrom-LogClearedXml $xml104
+Assert-True ($info104.Channel -eq "System" -and $info104.Account -eq "CONTOSO\alice") "Event 104 channel and account are read by name" "Channel=$($info104.Channel) Account=$($info104.Account)"
+$clearSources = @(Get-ChildItem "$repoRoot\modules" -Filter "Check-*.ps1" | Select-String -Pattern "Id\s*=\s*1102" | Select-Object -ExpandProperty Path -Unique)
+Assert-True ($clearSources.Count -eq 1) "Event log clears (1102) are detected by exactly one module" "$($clearSources.Count) modules"
+
 Write-TestHeader "Hosts File Security Entries"
 $adBlock = @("0.0.0.0 googleads.g.doubleclick.net", "0.0.0.0 google-analytics.com", "0.0.0.0 avgthing.example.com", "0.0.0.0 example.com # virustotal", "0.0.0.0 vortex.data.microsoft.com")
 Assert-True (@(Get-HostsSecurityEntry -Lines $adBlock).Count -eq 0) "Ad-block and telemetry hosts lines are not security entries"

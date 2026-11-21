@@ -17,14 +17,15 @@ function Invoke-DefenseEvasionChecks {
             foreach ($evt in $logClears) {
                 $daysAgo = ((Get-Date) - $evt.TimeCreated).TotalDays
                 $severity = if ($daysAgo -le 30) { "CRITICAL" } else { "WARNING" }
+                $clearInfo = ConvertFrom-LogClearedXml $evt.ToXml()
 
                 Add-Finding -Severity $severity -Category "DefenseEvasion" `
                     -Title "Security Event Log Cleared: $($evt.TimeCreated.ToString('yyyy-MM-dd HH:mm'))" `
-                    -Description "The Security event log was cleared on $($evt.TimeCreated). Attackers clear logs to cover their tracks. Account: $($evt.Properties[1].Value)." `
+                    -Description "The Security event log was cleared on $($evt.TimeCreated). Attackers clear logs to cover their tracks. Account: $($clearInfo.Account)." `
                     -Remediation "Investigate what happened around this time. Check other log sources (Application, System, PowerShell) for correlated activity." `
                     -Details @{
                         TimeCleared = $evt.TimeCreated
-                        Account = $evt.Properties[1].Value
+                        Account = $clearInfo.Account
                         DaysAgo = [math]::Round($daysAgo, 1)
                     } `
                     -MITRE @("T1070.001")
@@ -34,12 +35,13 @@ function Invoke-DefenseEvasionChecks {
         $sysLogClears = Get-WinEvent -FilterHashtable @{ LogName='System'; Id=104 } -MaxEvents 10 -ErrorAction SilentlyContinue
         if ($sysLogClears) {
             foreach ($evt in $sysLogClears) {
-                $clearedLog = $evt.Properties[0].Value
+                $clearInfo = ConvertFrom-LogClearedXml $evt.ToXml()
+                $clearedLog = if ($clearInfo.Channel) { $clearInfo.Channel } else { "unknown" }
                 Add-Finding -Severity "WARNING" -Category "DefenseEvasion" `
                     -Title "Event Log Cleared: $clearedLog ($($evt.TimeCreated.ToString('yyyy-MM-dd')))" `
-                    -Description "The '$clearedLog' event log was cleared on $($evt.TimeCreated)." `
+                    -Description "The '$clearedLog' event log was cleared on $($evt.TimeCreated) by account: $(if ($clearInfo.Account) { $clearInfo.Account } else { 'unknown' })." `
                     -Remediation "Investigate why this log was cleared. Cross-reference with other system activity." `
-                    -Details @{ LogName = $clearedLog; TimeCleared = $evt.TimeCreated } `
+                    -Details @{ LogName = $clearedLog; Account = $clearInfo.Account; TimeCleared = $evt.TimeCreated } `
                     -MITRE @("T1070.001")
             }
         }

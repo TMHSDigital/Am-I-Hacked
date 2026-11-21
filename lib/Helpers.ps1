@@ -420,6 +420,20 @@ function Get-FileSignature {
     return [PSCustomObject]@{ Status = "CheckFailed"; StatusMessage = "Signature check unavailable (PS.Security module could not be loaded)." }
 }
 
+function ConvertFrom-LogClearedXml {
+    <#
+        Reads the LogFileCleared user data of Security 1102 / System 104 events by field name.
+        Event 104's data is SubjectUserName, SubjectDomainName, Channel, BackupPath, so index-based
+        access to Properties[0] returns the account, not the channel.
+    #>
+    param([string]$Xml)
+    $data = $null
+    try { $data = ([xml]$Xml).Event.UserData.LogFileCleared } catch { }
+    if (-not $data) { return [PSCustomObject]@{ Channel = $null; Account = $null } }
+    $account = if ($data.SubjectDomainName -and $data.SubjectUserName) { "$($data.SubjectDomainName)\$($data.SubjectUserName)" } else { $data.SubjectUserName }
+    return [PSCustomObject]@{ Channel = $data.Channel; Account = $account }
+}
+
 function Get-HostsSecurityEntry {
     <#
         Returns hosts-file lines that map a security or update host (exact name or subdomain).
