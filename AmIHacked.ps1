@@ -201,7 +201,7 @@ $script:SignatureCheckAvailable = $null -ne (Get-Command Get-AuthenticodeSignatu
 if (-not $script:SignatureCheckAvailable) {
     Add-Finding -Severity "WARNING" -Category "General" `
         -Title "Signature Verification Degraded" `
-        -Description "The PowerShell Security module (Microsoft.PowerShell.Security) could not be loaded in this session. Authenticode signature checks will be skipped or may produce false positives. Affected checks: AMSI DLL integrity, COM hijack detection, unsigned process/file detection." `
+        -Description "The PowerShell Security module (Microsoft.PowerShell.Security) could not be loaded in this session. Authenticode signature checks are skipped, and files whose signature could not be verified are not flagged as unsigned. Affected checks: AMSI DLL integrity, COM hijack detection, unsigned process/file detection." `
         -Remediation "Run the scan in a fresh PowerShell session. If the issue persists, run 'sfc /scannow' to repair PowerShell modules."
 }
 

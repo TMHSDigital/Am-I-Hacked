@@ -68,7 +68,7 @@ function Invoke-DefenseEvasionChecks {
     $amsiDll = "$env:SystemRoot\System32\amsi.dll"
     if (Test-Path $amsiDll) {
         $sig = Get-FileSignature -FilePath $amsiDll
-        if ($sig -and $sig.Status -eq "CheckFailed") {
+        if (Test-SignatureUnknown $sig) {
             Write-Status "AMSI signature check unavailable (PS.Security module could not be loaded)." -Color DarkGray
         } elseif (-not $sig -or $sig.Status -ne "Valid") {
             Add-Finding -Severity "CRITICAL" -Category "DefenseEvasion" `

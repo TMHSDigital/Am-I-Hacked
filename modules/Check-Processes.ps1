@@ -50,7 +50,7 @@ function Invoke-ProcessesChecks {
         $seenProcessPaths[$pathKey] = 1
 
         $sig = Get-FileSignature -FilePath $procPath
-        if ($sig -and $sig.Status -ne "Valid") {
+        if ($sig -and $sig.Status -ne "Valid" -and -not (Test-SignatureUnknown $sig)) {
             $flaggedCount++
             $versionInfo = Get-FileVersionInfo -FilePath $procPath
 
@@ -158,7 +158,7 @@ function Invoke-ProcessesChecks {
                 } elseif ($versionInfo -and (Test-IsTrustedCompany $versionInfo.CompanyName)) {
                     $severity = "WARNING"
                     $title = "UNVERIFIED Process in Temp (claims trusted company): $($proc.Name)"
-                } elseif (-not $sig -or $sig.Status -ne "Valid") {
+                } elseif ((-not $sig -or $sig.Status -ne "Valid") -and -not (Test-SignatureUnknown $sig)) {
                     $severity = "CRITICAL"
                     $title = "UNSIGNED Process in Temp: $($proc.Name)"
                 } else {

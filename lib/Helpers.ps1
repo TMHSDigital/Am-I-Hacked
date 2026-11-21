@@ -420,6 +420,12 @@ function Get-FileSignature {
     return [PSCustomObject]@{ Status = "CheckFailed"; StatusMessage = "Signature check unavailable (PS.Security module could not be loaded)." }
 }
 
+function Test-SignatureUnknown {
+    <# True when the signature could not be checked (CheckFailed sentinel). Callers must treat this as unknown, never as unsigned. #>
+    param($Signature)
+    return [bool]($Signature -and $Signature.Status -eq "CheckFailed")
+}
+
 function Get-FileVersionInfo {
     param([string]$FilePath)
     try {

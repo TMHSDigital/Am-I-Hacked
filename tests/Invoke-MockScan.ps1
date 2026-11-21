@@ -102,6 +102,22 @@ Assert-True (-not (Test-IsUncommonRemotePort 443) -and -not (Test-IsUncommonRemo
 Assert-True (Test-IsUncommonRemotePort 23) "Outbound port 23 is an uncommon port"
 $script:Config = @{}
 
+Write-TestHeader "Degraded Signature Checks"
+# Simulate Get-AuthenticodeSignature being unavailable: every signature comes back as CheckFailed.
+. "$repoRoot\modules\Check-Processes.ps1"
+$script:Config = Get-DefaultConfig
+$script:Config.ProcessWhitelist = @()
+$script:Findings = [System.Collections.ArrayList]::new()
+$script:SuppressedCount = 0
+function Get-FileSignature { param([string]$FilePath) [PSCustomObject]@{ Status = "CheckFailed"; StatusMessage = "mock" } }
+Invoke-ProcessesChecks *> $null
+$sigFindings = @($script:Findings | Where-Object { $_.Title -match '^(Unsigned/Invalid Process|UNSIGNED Process in Temp):' })
+Assert-True ($sigFindings.Count -eq 0) "No process finding is raised only because the signature check failed" "$($sigFindings.Count) findings, e.g. $(($sigFindings | Select-Object -First 2 -ExpandProperty Title) -join '; ')"
+Remove-Item Function:\Get-FileSignature
+. "$repoRoot\lib\Helpers.ps1"
+$script:Config = @{}
+$script:Findings = $null
+
 # 1. Double-extension file in temp
 Write-TestHeader "Double Extension File"
 $doubleExtFile = Join-Path $testTempDir "invoice.pdf.exe"

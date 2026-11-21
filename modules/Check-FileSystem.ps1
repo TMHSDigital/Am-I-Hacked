@@ -35,6 +35,7 @@ function Invoke-FileSystemChecks {
 
             foreach ($file in $recentExes) {
                 $sig = Get-FileSignature -FilePath $file.FullName
+                if (Test-SignatureUnknown $sig) { continue }
                 if (-not $sig -or $sig.Status -ne "Valid") {
                     $suspiciousSystemFiles.Add($file) | Out-Null
 
@@ -58,6 +59,7 @@ function Invoke-FileSystemChecks {
 
             foreach ($file in $recentDlls) {
                 $sig = Get-FileSignature -FilePath $file.FullName
+                if (Test-SignatureUnknown $sig) { continue }
                 if (-not $sig -or $sig.Status -ne "Valid") {
                     Add-Finding -Severity "WARNING" -Category "FileSystem" `
                         -Title "Modified Unsigned System DLL: $($file.Name)" `
@@ -118,6 +120,7 @@ function Invoke-FileSystemChecks {
 
                 $severity = "WARNING"
                 $sig = $null
+                $sigUnknown = $false
                 $versionInfo = $null
 
                 if ($file.Extension -in @(".exe", ".dll", ".scr")) {
@@ -126,12 +129,15 @@ function Invoke-FileSystemChecks {
 
                     $isTrustedSigner = Test-IsTrustedSigner -Signature $sig -VersionInfo $versionInfo
                     $hasValidSig = $sig -and $sig.Status -eq "Valid"
+                    $sigUnknown = Test-SignatureUnknown $sig
 
                     if ($isTrustedSigner -or ($hasValidSig -and $inTrustedDir)) {
                         $skippedSigned.Add($file) | Out-Null
                         continue
                     } elseif ($hasValidSig) {
                         $severity = "INFO"
+                    } elseif ($sigUnknown) {
+                        $severity = "WARNING"
                     } elseif ($versionInfo -and (Test-IsTrustedCompany $versionInfo.CompanyName)) {
                         $severity = "WARNING"
                     } elseif (-not $hasValidSig) {
@@ -161,7 +167,7 @@ function Invoke-FileSystemChecks {
 
                 Add-Finding -Severity $severity -Category "FileSystem" `
                     -Title "Suspicious File in Temp: $($file.Name)" `
-                    -Description "Found '$($file.Name)' in '$($file.DirectoryName)'. $(if ($doubleExt) { 'WARNING: Double extension detected!' }) Size: $(Format-ByteSize $file.Length), Modified: $($file.LastWriteTime).$(if ($versionInfo -and $versionInfo.CompanyName) { " Company: $($versionInfo.CompanyName).$(if (-not $hasValidSig -and (Test-IsTrustedCompany $versionInfo.CompanyName)) { ' UNSIGNED.' })" })" `
+                    -Description "Found '$($file.Name)' in '$($file.DirectoryName)'. $(if ($doubleExt) { 'WARNING: Double extension detected!' }) Size: $(Format-ByteSize $file.Length), Modified: $($file.LastWriteTime).$(if ($versionInfo -and $versionInfo.CompanyName) { " Company: $($versionInfo.CompanyName).$(if (-not $hasValidSig -and -not $sigUnknown -and (Test-IsTrustedCompany $versionInfo.CompanyName)) { ' UNSIGNED.' })" })" `
                     -Remediation "Investigate this file. Check its hash on VirusTotal. If you didn't create it, delete it." `
                     -Details @{
                         Path = $file.FullName
@@ -592,7 +598,7 @@ function Invoke-FileSystemChecks {
                 if ($dllPath -notmatch "^C:\\Windows\\" -and $dllPath -notmatch "^C:\\Program Files") {
                     if (-not (Test-Path $dllPath)) { continue }  # stale registration — file gone, can't be exploited
                     $comSig = Get-FileSignature -FilePath $dllPath
-                    if ($comSig -and $comSig.Status -eq "Valid") { continue }
+                    if ($comSig -and ($comSig.Status -eq "Valid" -or (Test-SignatureUnknown $comSig))) { continue }
 
                     Add-Finding -Severity "WARNING" -Category "FileSystem" `
                         -Title "COM Hijack: $($clsid.PSChildName)" `
