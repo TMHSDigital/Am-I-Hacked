@@ -86,31 +86,34 @@ $script:Version = "0.5.0"
 
 . (Join-Path $PSScriptRoot "lib\Helpers.ps1")
 
+# ── Redact Map ───────────────────────────────────────────────────────────────
+
+if ($script:RedactMode) {
+    # Ordered: the profile path is replaced before the bare username, so a profile folder
+    # whose name differs from USERNAME still becomes C:\Users\REDACTED-USER.
+    $script:RedactMap = [ordered]@{}
+    $rUser = $env:USERNAME
+    $rComp = $env:COMPUTERNAME
+    $rDomain = $env:USERDOMAIN
+    if ($env:USERPROFILE) { $script:RedactMap[$env:USERPROFILE] = Join-Path (Split-Path $env:USERPROFILE -Parent) "REDACTED-USER" }
+    if ($rUser)   { $script:RedactMap[$rUser]   = "REDACTED-USER" }
+    if ($rComp)   { $script:RedactMap[$rComp]   = "REDACTED-PC" }
+    if ($rDomain -and $rDomain -ne $rComp) {
+        $script:RedactMap[$rDomain] = "REDACTED-DOMAIN"
+    }
+}
+
 # ── Load Config (silent — summary printed after banner) ──────────────────────
 
 if (Test-Path $ConfigPath) {
     try {
         $script:Config = Get-Content $ConfigPath -Raw | ConvertFrom-Json
     } catch {
-        Write-Warning "Failed to parse config at '$ConfigPath': $_. Using built-in defaults."
+        Write-Warning (Invoke-Redact "Failed to parse config at '$ConfigPath': $_. Using built-in defaults.")
         $script:Config = Get-DefaultConfig
     }
 } else {
     $script:Config = Get-DefaultConfig
-}
-
-# ── Redact Map ───────────────────────────────────────────────────────────────
-
-if ($script:RedactMode) {
-    $script:RedactMap = @{}
-    $rUser = $env:USERNAME
-    $rComp = $env:COMPUTERNAME
-    $rDomain = $env:USERDOMAIN
-    if ($rUser)   { $script:RedactMap[$rUser]   = "REDACTED-USER" }
-    if ($rComp)   { $script:RedactMap[$rComp]   = "REDACTED-PC" }
-    if ($rDomain -and $rDomain -ne $rComp) {
-        $script:RedactMap[$rDomain] = "REDACTED-DOMAIN"
-    }
 }
 
 # ── Admin Check ──────────────────────────────────────────────────────────────
@@ -257,7 +260,7 @@ foreach ($mod in $modules) {
         Write-Host "  [" -NoNewline -ForegroundColor DarkGray
         Write-Host "X" -NoNewline -ForegroundColor Red
         Write-Host "] " -NoNewline -ForegroundColor DarkGray
-        Write-Host "ERROR in $($mod.Name): $_" -ForegroundColor Red
+        Write-Host (Invoke-Redact "ERROR in $($mod.Name): $_") -ForegroundColor Red
         Add-Finding -Severity "INFO" -Category $mod.Name -Title "Module Error" `
             -Description "The $($mod.Description) module encountered an error: $_" `
             -Remediation "Check that all dependencies are available and you have appropriate permissions."
@@ -398,7 +401,7 @@ if ($critCount -gt 0) {
 }
 
 Write-Host ""
-Write-Host "  $reportFile" -ForegroundColor White
+Write-Host "  $(Invoke-Redact $reportFile)" -ForegroundColor White
 Write-Host ""
 
 # ── CI Mode: JSON summary + structured exit code ─────────────────────────────
@@ -412,7 +415,7 @@ if ($script:NonInteractive) {
         suppressed = $script:SuppressedCount
         total      = $totalCount
         duration   = [math]::Round($duration.TotalSeconds, 1)
-        reportPath = $reportFile
+        reportPath = Invoke-Redact $reportFile
         version    = $script:Version
     }
     Write-Host "---AMIHACKED-SUMMARY-JSON---"

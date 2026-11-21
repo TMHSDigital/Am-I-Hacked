@@ -46,7 +46,7 @@ function Write-Status {
     Write-Host "  [" -NoNewline -ForegroundColor DarkGray
     Write-Host "*" -NoNewline -ForegroundColor Cyan
     Write-Host "] " -NoNewline -ForegroundColor DarkGray
-    Write-Host $Message -ForegroundColor $Color
+    Write-Host (Invoke-Redact $Message) -ForegroundColor $Color
 }
 
 function Write-Section {

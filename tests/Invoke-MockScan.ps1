@@ -382,12 +382,18 @@ if (-not $jsonFiles) {
     $ciOutput = $null
     $ciExit = 0
     try {
-        $ciOutput = & "$repoRoot\AmIHacked.ps1" -OutputPath $ciOutputDir -Offline -CIMode -ExportJson 2>&1
+        # *>&1 captures Write-Host (information stream) as well as errors
+        $ciOutput = & "$repoRoot\AmIHacked.ps1" -OutputPath $ciOutputDir -Offline -CIMode -ExportJson *>&1
         $ciExit = $LASTEXITCODE
     } catch {
         $ciExit = $LASTEXITCODE
     }
     $ciOutputStr = $ciOutput -join "`n"
+
+    Write-TestHeader "CIMode Redaction"
+    $identityValues = @($env:USERNAME, $env:COMPUTERNAME, $env:USERDOMAIN) | Where-Object { $_ } | Select-Object -Unique
+    $leaks = @($ciOutput | ForEach-Object { "$_" } | Where-Object { $line = $_; @($identityValues | Where-Object { $line -match [regex]::Escape($_) }).Count -gt 0 })
+    Assert-True ($leaks.Count -eq 0) "CIMode output contains no username, computer name or domain" "$($leaks.Count) lines, e.g. $(($leaks | Select-Object -First 2) -join ' | ' -replace [regex]::Escape($env:USERNAME), '<user>')"
     if ($ciOutputStr -match "---AMIHACKED-SUMMARY-JSON---") {
         $jsonLine = ($ciOutputStr -split "---AMIHACKED-SUMMARY-JSON---")[-1].Trim()
         try {
