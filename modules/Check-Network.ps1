@@ -283,19 +283,14 @@ function Invoke-NetworkChecks {
             $_ -notmatch "^\s*::1\s+localhost\s*$"
         }
 
+        $suspiciousEntries = @($suspiciousEntries)
         if ($suspiciousEntries.Count -gt 0) {
-            $securityDomains = @("windowsupdate", "microsoft", "malwarebytes", "norton", "kaspersky",
-                                 "avast", "avg", "bitdefender", "virustotal", "google", "bing")
-
-            $blockedSecurity = $suspiciousEntries | Where-Object {
-                $entry = $_
-                $securityDomains | Where-Object { $entry -match $_ }
-            }
+            $blockedSecurity = @(Get-HostsSecurityEntry -Lines $suspiciousEntries)
 
             if ($blockedSecurity.Count -gt 0) {
                 Add-Finding -Severity "CRITICAL" -Category "Network" `
                     -Title "Hosts File Blocking Security Sites" `
-                    -Description "The hosts file contains entries that redirect security-related domains. This is a common malware technique to prevent updates and block access to security tools." `
+                    -Description "The hosts file maps security or update hosts (antivirus vendors, VirusTotal, Windows Update, Defender) to other addresses: $($blockedSecurity -join '; '). This is a common malware technique to prevent updates and block access to security tools." `
                     -Remediation "Remove the suspicious entries from $hostsPath. This is a strong indicator that malware has modified your system configuration." `
                     -Details @{
                         Entries = $blockedSecurity

@@ -420,6 +420,40 @@ function Get-FileSignature {
     return [PSCustomObject]@{ Status = "CheckFailed"; StatusMessage = "Signature check unavailable (PS.Security module could not be loaded)." }
 }
 
+function Get-HostsSecurityEntry {
+    <#
+        Returns hosts-file lines that map a security or update host (exact name or subdomain).
+        Lines are parsed into IP + host tokens with comments stripped, so ad/telemetry blocklists
+        (doubleclick.net, google-analytics.com, ...) and words inside comments do not match.
+    #>
+    param([string[]]$Lines)
+    $securityHosts = @(
+        "windowsupdate.com", "windowsupdate.microsoft.com", "update.microsoft.com", "delivery.mp.microsoft.com",
+        "definitionupdates.microsoft.com", "wdcp.microsoft.com", "wdcpalt.microsoft.com",
+        "smartscreen.microsoft.com", "smartscreen-prod.microsoft.com", "security.microsoft.com",
+        "virustotal.com", "malwarebytes.com", "norton.com", "symantec.com", "kaspersky.com", "kaspersky-labs.com",
+        "avast.com", "avg.com", "bitdefender.com", "bitdefender.net", "eset.com", "sophos.com",
+        "mcafee.com", "trendmicro.com", "f-secure.com", "avira.com"
+    )
+    $result = [System.Collections.ArrayList]::new()
+    foreach ($line in $Lines) {
+        if (-not $line) { continue }
+        $content = ($line -replace '#.*$', '').Trim()
+        if (-not $content) { continue }
+        $tokens = @($content -split '\s+')
+        if ($tokens.Count -lt 2) { continue }
+        foreach ($hostName in $tokens[1..($tokens.Count - 1)]) {
+            $h = $hostName.ToLower().TrimEnd('.')
+            $isSecurity = $false
+            foreach ($d in $securityHosts) {
+                if ($h -eq $d -or $h.EndsWith(".$d")) { $isSecurity = $true; break }
+            }
+            if ($isSecurity) { $result.Add($line) | Out-Null; break }
+        }
+    }
+    return $result.ToArray()
+}
+
 function Test-AVProductEnabled {
     <# Decodes Security Center productState: 0x10 in the middle byte (0x00FF00) means the real-time scanner is on. #>
     param([int]$ProductState)

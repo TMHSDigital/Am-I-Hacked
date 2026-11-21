@@ -102,6 +102,12 @@ Assert-True (-not (Test-IsUncommonRemotePort 443) -and -not (Test-IsUncommonRemo
 Assert-True (Test-IsUncommonRemotePort 23) "Outbound port 23 is an uncommon port"
 $script:Config = @{}
 
+Write-TestHeader "Hosts File Security Entries"
+$adBlock = @("0.0.0.0 googleads.g.doubleclick.net", "0.0.0.0 google-analytics.com", "0.0.0.0 avgthing.example.com", "0.0.0.0 example.com # virustotal", "0.0.0.0 vortex.data.microsoft.com")
+Assert-True (@(Get-HostsSecurityEntry -Lines $adBlock).Count -eq 0) "Ad-block and telemetry hosts lines are not security entries"
+$secHosts = @("0.0.0.0 www.virustotal.com", "1.2.3.4 update.microsoft.com", "127.0.0.1 example.com download.windowsupdate.com")
+Assert-True (@(Get-HostsSecurityEntry -Lines ($secHosts + $adBlock)).Count -eq 3) "Security/update hosts lines are detected"
+
 Write-TestHeader "Severity Escalation"
 Assert-True ((Get-MaxSeverity "CRITICAL" "WARNING") -eq "CRITICAL" -and (Get-MaxSeverity "INFO" "WARNING") -eq "WARNING" -and (Get-MaxSeverity "WARNING" "CRITICAL") -eq "CRITICAL") "Get-MaxSeverity only ever raises severity"
 
