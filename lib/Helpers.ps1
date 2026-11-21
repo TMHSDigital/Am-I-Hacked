@@ -494,6 +494,47 @@ function ConvertFrom-LogClearedXml {
     return [PSCustomObject]@{ Channel = $data.Channel; Account = $account }
 }
 
+function Get-PacUrlSeverity {
+    <#
+        Severity for a proxy auto-config (PAC) URL: CRITICAL for local files, raw-IP hosts or
+        user-writable paths (typical of adware and banking trojans), INFO when delivered by
+        Group Policy, otherwise WARNING.
+    #>
+    param([string]$Url, [bool]$FromPolicy = $false)
+    $u = "$Url".Trim()
+    $isFile = $u -match '^file:' -or $u -match '^[a-zA-Z]:\\' -or $u -match '^\\\\'
+    $isRawIp = $u -match '^[a-z]+://(\d{1,3}\.){3}\d{1,3}([:/]|$)' -or $u -match '^[a-z]+://\[[0-9a-fA-F:]+\]'
+    $isUserWritable = $u -match '(?i)\\Users\\|/Users/|AppData|\\Temp\\|/Temp/'
+    if ($isFile -or $isRawIp -or $isUserWritable) { return "CRITICAL" }
+    if ($FromPolicy) { return "INFO" }
+    return "WARNING"
+}
+
+function ConvertFrom-WinHttpSettings {
+    <#
+        Decodes the WinHttpSettings blob (HKLM\...\Internet Settings\Connections):
+        DWORD version, DWORD counter, DWORD flags (bit 0x2 = named proxy), DWORD proxy length,
+        proxy (ASCII), DWORD bypass length, bypass list (ASCII).
+    #>
+    param([byte[]]$Bytes)
+    if (-not $Bytes -or $Bytes.Length -lt 16) { return $null }
+    $flags = [BitConverter]::ToInt32($Bytes, 8)
+    $proxyLen = [BitConverter]::ToInt32($Bytes, 12)
+    $proxy = ""
+    $bypass = ""
+    if ($proxyLen -gt 0 -and $Bytes.Length -ge 16 + $proxyLen) {
+        $proxy = [System.Text.Encoding]::ASCII.GetString($Bytes, 16, $proxyLen)
+        $bypassOffset = 16 + $proxyLen
+        if ($Bytes.Length -ge $bypassOffset + 4) {
+            $bypassLen = [BitConverter]::ToInt32($Bytes, $bypassOffset)
+            if ($bypassLen -gt 0 -and $Bytes.Length -ge $bypassOffset + 4 + $bypassLen) {
+                $bypass = [System.Text.Encoding]::ASCII.GetString($Bytes, $bypassOffset + 4, $bypassLen)
+            }
+        }
+    }
+    return [PSCustomObject]@{ UsesProxy = (($flags -band 0x2) -ne 0 -and $proxy); Proxy = $proxy; Bypass = $bypass }
+}
+
 function Get-HostsSecurityEntry {
     <#
         Returns hosts-file lines that map a security or update host (exact name or subdomain).

@@ -325,7 +325,48 @@ function Invoke-NetworkChecks {
                 } `
                 -MITRE @("T1090")
         }
-    } catch {}
+    } catch {
+        Write-Verbose "Could not read user proxy settings: $_"
+    }
+
+    # Proxy auto-config (PAC): usually set with ProxyEnable = 0, so it needs its own check
+    $pacSources = @(
+        @{ Path = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings"; Scope = "Current user"; Policy = $false }
+        @{ Path = "HKLM:\Software\Microsoft\Windows\CurrentVersion\Internet Settings"; Scope = "Machine"; Policy = $false }
+        @{ Path = "HKCU:\Software\Policies\Microsoft\Windows\CurrentVersion\Internet Settings"; Scope = "User policy"; Policy = $true }
+        @{ Path = "HKLM:\Software\Policies\Microsoft\Windows\CurrentVersion\Internet Settings"; Scope = "Machine policy"; Policy = $true }
+    )
+    foreach ($src in $pacSources) {
+        try {
+            $pacUrl = (Get-ItemProperty $src.Path -Name AutoConfigURL -ErrorAction SilentlyContinue).AutoConfigURL
+            if (-not $pacUrl) { continue }
+            $pacSeverity = Get-PacUrlSeverity -Url $pacUrl -FromPolicy $src.Policy
+            Add-Finding -Severity $pacSeverity -Category "Network" `
+                -Title "Proxy Auto-Config (PAC) URL Set: $pacUrl" `
+                -Description "$($src.Scope) setting '$($src.Path)' points the browser proxy configuration at the PAC script '$pacUrl'.$(if ($src.Policy) { ' It is delivered by policy, which is common in corporate networks.' }) A PAC script decides which proxy each request goes through, so adware and banking trojans use it to intercept traffic.$(if ($pacSeverity -eq 'CRITICAL') { ' The script is a local file, a raw IP address or in a user-writable location, which is typical of malware.' })" `
+                -Remediation "If you didn't configure this, turn off 'Use setup script' in Settings > Network & Internet > Proxy, or remove it: Remove-ItemProperty -Path '$($src.Path)' -Name AutoConfigURL" `
+                -Details @{ Path = $src.Path; AutoConfigURL = $pacUrl; FromPolicy = $src.Policy } `
+                -MITRE @("T1090", "T1557")
+        } catch {
+            Write-Verbose "Could not read AutoConfigURL from $($src.Path): $_"
+        }
+    }
+
+    # Machine-wide WinHTTP proxy (used by services and many system components)
+    try {
+        $winHttpBlob = (Get-ItemProperty "HKLM:\Software\Microsoft\Windows\CurrentVersion\Internet Settings\Connections" -Name WinHttpSettings -ErrorAction SilentlyContinue).WinHttpSettings
+        $winHttp = ConvertFrom-WinHttpSettings -Bytes $winHttpBlob
+        if ($winHttp -and $winHttp.UsesProxy) {
+            Add-Finding -Severity "WARNING" -Category "Network" `
+                -Title "WinHTTP Proxy Configured: $($winHttp.Proxy)" `
+                -Description "The machine-wide WinHTTP proxy is set to '$($winHttp.Proxy)'$(if ($winHttp.Bypass) { " (bypass: $($winHttp.Bypass))" }). Windows services and system components send traffic through it. This is normal on some corporate networks; elsewhere it can indicate traffic interception." `
+                -Remediation "Check the setting with 'netsh winhttp show proxy'. If you didn't configure it, reset it from an elevated prompt: netsh winhttp reset proxy" `
+                -Details @{ Proxy = $winHttp.Proxy; Bypass = $winHttp.Bypass } `
+                -MITRE @("T1090", "T1557")
+        }
+    } catch {
+        Write-Verbose "Could not read WinHTTP proxy settings: $_"
+    }
 
     # ── 7. Firewall Status ───────────────────────────────────────────────
 

@@ -168,6 +168,15 @@ try {
         Assert-True ($trustedRoots.Thumbprints.ContainsKey("8F43288AD272F3103B6FB1428485EA3014C0BCFE")) "Windows default root is on the trusted root list (authroot CTL)"
     }
 
+    Write-TestHeader "Proxy Configuration"
+    Assert-True ((Get-PacUrlSeverity "http://wpad.corp.example.com/proxy.pac") -eq "WARNING" -and (Get-PacUrlSeverity "http://wpad.corp.example.com/proxy.pac" $true) -eq "INFO") "PAC URL on a host name is WARNING (INFO when set by policy)"
+    Assert-True ((Get-PacUrlSeverity "file:///C:/Users/a/AppData/x.pac") -eq "CRITICAL" -and (Get-PacUrlSeverity "http://203.0.113.9/p.pac" $true) -eq "CRITICAL") "PAC URL from a local file or raw IP is CRITICAL"
+    $directBlob = [byte[]](0x18,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0, 0,0,0,0)
+    $proxyText = [System.Text.Encoding]::ASCII.GetBytes("10.0.0.5:8080"); $bypassText = [System.Text.Encoding]::ASCII.GetBytes("<local>")
+    $proxyBlob = [byte[]](@(0x18,0,0,0, 0,0,0,0, 3,0,0,0) + [BitConverter]::GetBytes([int]$proxyText.Length) + $proxyText + [BitConverter]::GetBytes([int]$bypassText.Length) + $bypassText)
+    $decodedProxy = ConvertFrom-WinHttpSettings $proxyBlob
+    Assert-True (-not (ConvertFrom-WinHttpSettings $directBlob).UsesProxy -and $decodedProxy.UsesProxy -and $decodedProxy.Proxy -eq "10.0.0.5:8080" -and $decodedProxy.Bypass -eq "<local>") "WinHTTP proxy settings decode (direct vs named proxy)"
+
     Write-TestHeader "Hosts File Security Entries"
     $adBlock = @("0.0.0.0 googleads.g.doubleclick.net", "0.0.0.0 google-analytics.com", "0.0.0.0 avgthing.example.com", "0.0.0.0 example.com # virustotal", "0.0.0.0 vortex.data.microsoft.com")
     Assert-True (@(Get-HostsSecurityEntry -Lines $adBlock).Count -eq 0) "Ad-block and telemetry hosts lines are not security entries"
