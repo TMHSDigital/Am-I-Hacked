@@ -96,6 +96,12 @@ Generate-HtmlReport -Findings $unitFindings -SystemInfo @{ ComputerName = "UNIT"
 $unitHtml = Get-Content $unitReport -Raw
 Assert-True ($unitHtml -match 'data-verdict="COMPROMISED" data-critical="1"') "Single CRITICAL finding yields COMPROMISED verdict and count 1" "report verdict banner: $([regex]::Match($unitHtml, 'data-verdict="[^"]*" data-critical="[^"]*"').Value)"
 
+Write-TestHeader "Outbound Port Classification"
+$script:Config = Get-DefaultConfig
+Assert-True (-not (Test-IsUncommonRemotePort 443) -and -not (Test-IsUncommonRemotePort 80) -and -not (Test-IsUncommonRemotePort 53)) "Outbound 443/80/53 are not uncommon ports"
+Assert-True (Test-IsUncommonRemotePort 23) "Outbound port 23 is an uncommon port"
+$script:Config = @{}
+
 # 1. Double-extension file in temp
 Write-TestHeader "Double Extension File"
 $doubleExtFile = Join-Path $testTempDir "invoice.pdf.exe"

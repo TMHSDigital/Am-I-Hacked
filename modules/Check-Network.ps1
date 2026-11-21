@@ -75,9 +75,8 @@ function Invoke-NetworkChecks {
                 -MITRE @("T1071.001")
         }
 
-        $commonPorts = if ($script:Config.TrustedPorts) { $script:Config.TrustedPorts } else { @(80, 443, 8080, 8443, 993, 995, 587, 465, 53, 22) }
         foreach ($c in $connList) {
-            if ($c.RemotePort -notin $commonPorts -and $c.RemotePort -lt 1024) {
+            if (Test-IsUncommonRemotePort -Port $c.RemotePort) {
                 Add-Finding -Severity "WARNING" -Category "Network" `
                     -Title "Connection on Uncommon Port: $($c.Process) → ${ip}:$($c.RemotePort)" `
                     -Description "Process '$($c.Process)' (PID: $($c.PID)) has a connection to ${ip}:$($c.RemotePort). Low-numbered non-standard ports can indicate unusual protocols or C2 channels." `

@@ -233,7 +233,8 @@ Then edit `config/config.json` (gitignored — API keys stay local):
 | `ProcessWhitelist` | `string[]` | Process names to skip during signature checks |
 | `ServiceWhitelist` | `string[]` | Service names to skip |
 | `TrustedIPs` | `string[]` | IPs/CIDRs that won't be flagged |
-| `TrustedPorts` | `int[]` | Expected listening ports |
+| `TrustedPorts` | `int[]` | Expected listening ports (affects listener checks only) |
+| `CommonRemotePorts` | `int[]` | Remote ports below 1024 that outbound connections may use without a "Connection on Uncommon Port" warning |
 | `TrustedCompanies` | `string[]` | Vendor names for trust verification |
 | `TrustedDomainSuffixes` | `string[]` | Domain suffixes for reverse-DNS FP reduction |
 | `VirusTotalAPIKey` | `string` | VT API key for hash lookups |

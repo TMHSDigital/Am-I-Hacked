@@ -250,6 +250,8 @@ function Get-DefaultConfig {
 
         TrustedPorts = @(135, 139, 445, 5040, 7680, 5432, 5357, 2179, 8811, 3306, 6379, 27017, 8080, 8443, 3000, 5000, 5500, 8000)
 
+        CommonRemotePorts = @(80, 443, 53, 22, 993, 995, 587, 465, 853)
+
         VirusTotalAPIKey = ""
         AbuseIPDBKey     = ""
 
@@ -339,6 +341,14 @@ function New-DefaultConfig {
 }
 
 # ── Utility Functions ────────────────────────────────────────────────────────
+
+function Test-IsUncommonRemotePort {
+    # Outbound connections to a well-known port below 1024 that is not in CommonRemotePorts.
+    # TrustedPorts is for listeners only and is deliberately not consulted here.
+    param([int]$Port)
+    $common = if ($script:Config.CommonRemotePorts) { $script:Config.CommonRemotePorts } else { @(80, 443, 53, 22, 993, 995, 587, 465, 853) }
+    return ($Port -lt 1024 -and $Port -notin $common)
+}
 
 function Test-IsTrustedIP {
     param([string]$IP)
