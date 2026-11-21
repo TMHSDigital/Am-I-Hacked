@@ -420,6 +420,12 @@ function Get-FileSignature {
     return [PSCustomObject]@{ Status = "CheckFailed"; StatusMessage = "Signature check unavailable (PS.Security module could not be loaded)." }
 }
 
+function Select-MpExclusion {
+    <# Drops the "N/A: Must be an administrator to view exclusions" placeholder Defender returns to non-admin callers. #>
+    param([object[]]$Values)
+    return @($Values | Where-Object { $_ -and "$_" -notmatch '^N/A:' })
+}
+
 function Test-IsDefaultWmiBinding {
     <# True for the binding Windows ships by default (SCM Event Log Filter -> NTEventLogEventConsumer "SCM Event Log Consumer"). #>
     param([string]$Filter, [string]$Consumer)
@@ -559,9 +565,9 @@ function Export-Baseline {
             )
 
             DefenderExclusions = @{
-                Paths      = @(try { (Get-MpPreference -ErrorAction SilentlyContinue).ExclusionPath } catch { @() })
-                Processes  = @(try { (Get-MpPreference -ErrorAction SilentlyContinue).ExclusionProcess } catch { @() })
-                Extensions = @(try { (Get-MpPreference -ErrorAction SilentlyContinue).ExclusionExtension } catch { @() })
+                Paths      = @(Select-MpExclusion @(try { (Get-MpPreference -ErrorAction SilentlyContinue).ExclusionPath } catch { @() }))
+                Processes  = @(Select-MpExclusion @(try { (Get-MpPreference -ErrorAction SilentlyContinue).ExclusionProcess } catch { @() }))
+                Extensions = @(Select-MpExclusion @(try { (Get-MpPreference -ErrorAction SilentlyContinue).ExclusionExtension } catch { @() }))
             }
         }
 

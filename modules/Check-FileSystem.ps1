@@ -905,11 +905,20 @@ function Invoke-FileSystemChecks {
     try {
         $prefs = Get-MpPreference -ErrorAction SilentlyContinue
 
-        $exclusionPaths = $prefs.ExclusionPath
-        $exclusionProcesses = $prefs.ExclusionProcess
-        $exclusionExtensions = $prefs.ExclusionExtension
+        $rawExclusions = @($prefs.ExclusionPath) + @($prefs.ExclusionProcess) + @($prefs.ExclusionExtension)
+        if (@($rawExclusions | Where-Object { "$_" -match '^N/A:' }).Count -gt 0) {
+            Add-Finding -Severity "INFO" -Category "FileSystem" `
+                -Title "Defender Exclusions Not Readable" `
+                -Description "Windows Defender only shows its exclusion lists to administrators, so exclusions could not be checked in this session." `
+                -Remediation "Re-run the scan from an elevated PowerShell session to inspect Defender exclusions." `
+                -MITRE @("T1562.001")
+        }
 
-        if ($exclusionPaths -and $exclusionPaths.Count -gt 0) {
+        $exclusionPaths = @(Select-MpExclusion $prefs.ExclusionPath)
+        $exclusionProcesses = @(Select-MpExclusion $prefs.ExclusionProcess)
+        $exclusionExtensions = @(Select-MpExclusion $prefs.ExclusionExtension)
+
+        if ($exclusionPaths.Count -gt 0) {
             foreach ($path in $exclusionPaths) {
                 $severity = "WARNING"
                 if ($path -match "\\Temp\\" -or $path -match "\\AppData\\" -or $path -match "C:\\$") {
@@ -925,7 +934,7 @@ function Invoke-FileSystemChecks {
             }
         }
 
-        if ($exclusionProcesses -and $exclusionProcesses.Count -gt 0) {
+        if ($exclusionProcesses.Count -gt 0) {
             foreach ($proc in $exclusionProcesses) {
                 Add-Finding -Severity "WARNING" -Category "FileSystem" `
                     -Title "Defender Exclusion (Process): $proc" `
@@ -936,7 +945,7 @@ function Invoke-FileSystemChecks {
             }
         }
 
-        if ($exclusionExtensions -and $exclusionExtensions.Count -gt 0) {
+        if ($exclusionExtensions.Count -gt 0) {
             foreach ($ext in $exclusionExtensions) {
                 Add-Finding -Severity "WARNING" -Category "FileSystem" `
                     -Title "Defender Exclusion (Extension): $ext" `

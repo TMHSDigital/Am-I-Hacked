@@ -102,6 +102,10 @@ Assert-True (-not (Test-IsUncommonRemotePort 443) -and -not (Test-IsUncommonRemo
 Assert-True (Test-IsUncommonRemotePort 23) "Outbound port 23 is an uncommon port"
 $script:Config = @{}
 
+Write-TestHeader "Defender Exclusion Placeholder"
+$filtered = @(Select-MpExclusion @("N/A: Must be an administrator to view exclusions", "C:\Tools"))
+Assert-True ($filtered.Count -eq 1 -and $filtered[0] -eq "C:\Tools") "Non-admin 'N/A:' placeholder is dropped, real exclusions kept"
+
 Write-TestHeader "WMI Default Binding Allowlist"
 Assert-True (Test-IsDefaultWmiBinding '__EventFilter.Name="SCM Event Log Filter"' 'NTEventLogEventConsumer.Name="SCM Event Log Consumer"') "Default SCM Event Log binding is allowlisted"
 Assert-True (-not (Test-IsDefaultWmiBinding '__EventFilter.Name="Updater"' 'CommandLineEventConsumer.Name="Updater"')) "Non-default WMI binding is not allowlisted"
@@ -183,6 +187,9 @@ if (-not $jsonFiles) {
 
     Assert-FindingExists -Findings $findings -TitlePattern "Double Extension.*\.exe" -TestName "Detected double-extension file (invoice.pdf.exe)"
 
+    $placeholderFindings = @($findings | Where-Object { $_.Title -match '^Defender Exclusion \(\w+\): N/A:' })
+    Assert-True ($placeholderFindings.Count -eq 0) "No Defender Exclusion finding from the non-admin placeholder" "$($placeholderFindings.Count) found"
+
     # Category coverage: each active module should produce at least one finding
     Write-TestHeader "Module Coverage"
     Assert-FindingCount -Findings $findings -Category "FileSystem"     -MinCount 1 -TestName "FileSystem module produced findings"
@@ -238,6 +245,8 @@ if (-not $jsonFiles) {
     $baselineFile = Join-Path $outputDir "baseline_latest.json"
     if (Test-Path $baselineFile) {
         $baseline = Get-Content $baselineFile -Raw | ConvertFrom-Json
+        $baselineExcl = @($baseline.DefenderExclusions.Paths) + @($baseline.DefenderExclusions.Processes) + @($baseline.DefenderExclusions.Extensions)
+        Assert-True (@($baselineExcl | Where-Object { "$_" -match '^N/A:' }).Count -eq 0) "Baseline does not store the Defender 'N/A:' placeholder"
         if ($baseline.Timestamp -and $baseline.Services -and $baseline.ListeningPorts) {
             Write-Host "  [PASS] Baseline exported with valid structure" -ForegroundColor Green
             $script:TestsPassed++
