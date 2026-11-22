@@ -251,6 +251,78 @@ try {
     $secHosts = @("0.0.0.0 www.virustotal.com", "1.2.3.4 update.microsoft.com", "127.0.0.1 example.com download.windowsupdate.com")
     Assert-True (@(Get-HostsSecurityEntry -Lines ($secHosts + $adBlock)).Count -eq 3) "Security/update hosts lines are detected"
 
+    Write-TestHeader "Finding Rule IDs"
+    # Every Add-Finding call outside the tests passes a constant -RuleId; IDs are unique and match docs/RULES.md
+    $ruleCalls = [System.Collections.ArrayList]::new()
+    $missingRule = [System.Collections.ArrayList]::new()
+    $codeFiles = @(Get-Item "$repoRoot\AmIHacked.ps1") + @(Get-ChildItem "$repoRoot\lib", "$repoRoot\modules" -Filter "*.ps1")
+    foreach ($codeFile in $codeFiles) {
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($codeFile.FullName, [ref]$null, [ref]$null)
+        $calls = $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] -and $n.GetCommandName() -eq "Add-Finding" }, $true)
+        foreach ($call in $calls) {
+            $els = $call.CommandElements
+            $idx = -1
+            for ($i = 0; $i -lt $els.Count; $i++) { if ($els[$i] -is [System.Management.Automation.Language.CommandParameterAst] -and $els[$i].ParameterName -eq "RuleId") { $idx = $i } }
+            if ($idx -ge 0 -and $idx + 1 -lt $els.Count -and $els[$idx + 1] -is [System.Management.Automation.Language.StringConstantExpressionAst]) {
+                $ruleCalls.Add($els[$idx + 1].Value) | Out-Null
+            } else {
+                $missingRule.Add("$($codeFile.Name):$($call.Extent.StartLineNumber)") | Out-Null
+            }
+        }
+    }
+    $dupRules = @($ruleCalls | Group-Object | Where-Object { $_.Count -gt 1 } | ForEach-Object Name)
+    $badFormat = @($ruleCalls | Where-Object { $_ -cnotmatch '^AIH-[A-Z]+-[A-Z0-9-]+$' })
+    Assert-True ($ruleCalls.Count -ge 90 -and $missingRule.Count -eq 0) "Every Add-Finding call has a constant -RuleId" "$($ruleCalls.Count) with IDs; missing: $($missingRule -join ', ')"
+    Assert-True ($dupRules.Count -eq 0 -and $badFormat.Count -eq 0) "Rule IDs are unique and follow AIH-<AREA>-<NAME>" "duplicates: $($dupRules -join ', '); bad: $($badFormat -join ', ')"
+    $docRules = @([regex]::Matches((Get-Content "$repoRoot\docs\RULES.md" -Raw), '(?m)^\| `(AIH-[A-Z0-9-]+)`') | ForEach-Object { $_.Groups[1].Value })
+    $undocumented = @($ruleCalls | Where-Object { $_ -notin $docRules })
+    $staleDocs = @($docRules | Where-Object { $_ -notin $ruleCalls })
+    Assert-True ($undocumented.Count -eq 0 -and $staleDocs.Count -eq 0) "docs/RULES.md lists exactly the rule IDs used in the code" "undocumented: $($undocumented -join ', '); not in code: $($staleDocs -join ', ')"
+
+    Assert-True ((Get-FallbackRuleId -Category "My Module" -Title "Odd Thing: x (3)") -eq "CUSTOM-MYMODULE-ODD-THING" -and (Get-FallbackRuleId -Category "X" -Title "!!!") -eq "CUSTOM-X-FINDING") "Findings without -RuleId get a CUSTOM-<CATEGORY>-<TITLE> ID"
+
+    $sups = @(
+        [PSCustomObject]@{ rule = "AIH-NET-UNUSUAL-LISTENER"; key = "6463|*"; reason = "a" },
+        [PSCustomObject]@{ rule = "AIH-PROC-UNQUOTED-*"; reason = "b" },
+        [PSCustomObject]@{ key = "anything"; reason = "key alone does nothing" },
+        @{ pattern = "Autorun Entry: OneDrive*"; rule = "AIH-FS-AUTORUN" },
+        [PSCustomObject]@{ rule = "AIH-FS-TEMP-FILE"; key = "C:\x\[1].exe" }
+    )
+    $supCases = @(
+        @("Unusual Listening Port: 6463 (Discord)", "AIH-NET-UNUSUAL-LISTENER", "6463|Discord", $true),
+        @("Unusual Listening Port: 6464 (Discord)", "AIH-NET-UNUSUAL-LISTENER", "6464|Discord", $false),
+        @("Unquoted Service Path: Foo", "AIH-PROC-UNQUOTED-SERVICE-PATH", "Foo", $true),
+        @("Something", "AIH-NET-SYSTEM-PROXY", "anything", $false),
+        @("Autorun Entry: OneDriveSetup", "AIH-FS-AUTORUN", "HKCU:\Run\OneDriveSetup", $true),
+        @("Autorun Entry: OneDriveSetup", "AIH-FS-AUTORUN-SUSPICIOUS", "HKCU:\Run\OneDriveSetup", $false),
+        @("Suspicious File in Temp: [1].exe", "AIH-FS-TEMP-FILE", "C:\x\[1].exe", $true)
+    )
+    $supWrong = @($supCases | Where-Object { (Test-FindingSuppressed -Title $_[0] -RuleId $_[1] -Key $_[2] -Suppressions $sups) -ne $_[3] } | ForEach-Object { "$($_[1]) $($_[2])" })
+    Assert-True ($supWrong.Count -eq 0) "Suppressions match by rule, rule + key, and title pattern + rule; key alone suppresses nothing" ($supWrong -join "; ")
+
+    $script:Config = @{ Suppressions = @() }
+    $script:Findings = [System.Collections.ArrayList]::new()
+    $script:RedactMode = $true
+    $script:RedactMap = [ordered]@{ "C:\Users\Jane.Doe" = "C:\Users\REDACTED-USER" }
+    Add-Finding -Severity "WARNING" -Category "FileSystem" -RuleId "AIH-FS-TEMP-FILE" -Key "C:\Users\Jane.Doe\AppData\Local\Temp\a.exe" -Title "Suspicious File in Temp: a.exe" -Description "d" -Details @{ Path = "C:\Users\Jane.Doe\AppData\Local\Temp\a.exe" } -MITRE @("T1204.002") *> $null
+    Add-Finding -Severity "INFO" -Category "Custom" -Title "Odd Thing: 1" -Description "d" *> $null
+    $script:RedactMode = $false
+    $script:RedactMap = @{}
+    $f0 = $script:Findings[0]
+    Assert-True ($f0.RuleId -eq "AIH-FS-TEMP-FILE" -and $f0.Key -eq "C:\Users\REDACTED-USER\AppData\Local\Temp\a.exe" -and $script:Findings[1].RuleId -eq "CUSTOM-CUSTOM-ODD-THING") "Add-Finding stores RuleId and a redacted Key"
+
+    $sarif = ConvertTo-SarifLog -Findings @($script:Findings) -Version "9.9.9"
+    $sarifRun = $sarif.runs[0]
+    $sarifOk = ($sarif.version -eq "2.1.0" -and $sarifRun.tool.driver.version -eq "9.9.9" -and @($sarifRun.tool.driver.rules).Count -eq 2 -and
+                @($sarifRun.results).Count -eq 2 -and $sarifRun.results[0].ruleId -eq "AIH-FS-TEMP-FILE" -and $sarifRun.results[0].level -eq "warning" -and
+                $sarifRun.results[1].level -eq "note" -and
+                $sarifRun.results[0].partialFingerprints["amIHacked/v1"] -eq "AIH-FS-TEMP-FILE|C:\Users\REDACTED-USER\AppData\Local\Temp\a.exe" -and
+                $sarifRun.results[0].locations[0].physicalLocation.artifactLocation.uri -eq "file:///C:/Users/REDACTED-USER/AppData/Local/Temp/a.exe" -and
+                -not $sarifRun.results[1].Contains("locations"))
+    Assert-True $sarifOk "SARIF log has rules, levels, fingerprints and file locations" ($sarif | ConvertTo-Json -Depth 12 -Compress)
+    $script:Findings = $null
+    $script:Config = Get-DefaultConfig
+
     Write-TestHeader "Severity Escalation"
     Assert-True ((Get-MaxSeverity "CRITICAL" "WARNING") -eq "CRITICAL" -and (Get-MaxSeverity "INFO" "WARNING") -eq "WARNING" -and (Get-MaxSeverity "WARNING" "CRITICAL") -eq "CRITICAL") "Get-MaxSeverity only ever raises severity"
 
@@ -491,7 +563,7 @@ try {
     New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 
     try {
-        & "$repoRoot\AmIHacked.ps1" -OutputPath $outputDir -ExportJson -Offline -CreateBaseline -CIMode -SkipModules @() *>&1 | Out-Null
+        & "$repoRoot\AmIHacked.ps1" -OutputPath $outputDir -ExportJson -ExportSarif -Offline -CreateBaseline -CIMode -SkipModules @() *>&1 | Out-Null
     } catch {
         Write-Host "  [ERROR] Scan failed: $_" -ForegroundColor Red
     }
@@ -575,6 +647,13 @@ try {
             Write-Host "  [FAIL] JSON structure missing required fields" -ForegroundColor Red
             $script:TestsFailed++
         }
+
+        $noRule = @($results.Findings | Where-Object { $_.RuleId -notmatch '^AIH-' })
+        Assert-True (@($results.Findings).Count -gt 0 -and $noRule.Count -eq 0) "Every finding in the JSON export has an AIH- rule ID" "$($noRule.Count) without: $(@($noRule | Select-Object -First 3 | ForEach-Object Title) -join ', ')"
+        $sarifFile = Get-ChildItem $outputDir -Filter "*.sarif" | Select-Object -First 1
+        $sarifBytes = if ($sarifFile) { [System.IO.File]::ReadAllBytes($sarifFile.FullName) } else { @() }
+        $sarifDoc = if ($sarifFile) { Get-Content $sarifFile.FullName -Raw | ConvertFrom-Json } else { $null }
+        Assert-True ($sarifDoc -and $sarifDoc.version -eq "2.1.0" -and @($sarifDoc.runs[0].results).Count -eq @($results.Findings).Count -and $sarifBytes[0] -ne 0xEF) "-ExportSarif writes a SARIF 2.1.0 file (no BOM) with one result per finding"
 
         # Check baseline was exported (only when -CreateBaseline used)
         Write-TestHeader "Baseline Export"

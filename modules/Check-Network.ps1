@@ -68,6 +68,7 @@ function Invoke-NetworkChecks {
             }
 
             Add-Finding -Severity $severity -Category "Network" `
+                -RuleId "AIH-NET-HIGH-CONNECTION-COUNT" -Key "$ip" `
                 -Title "High Connection Count to $ip ($($connList.Count) connections)" `
                 -Description "Detected $($connList.Count) active connections to external IP $ip$(if ($resolvedHost) { " ($resolvedHost)" }) from processes: $($uniqueProcs -join ', '). High connection counts to a single IP may indicate data exfiltration or C2 beaconing." `
                 -Remediation "Investigate this IP address. Check it against threat intelligence feeds (VirusTotal, AbuseIPDB). If unexpected, consider blocking it in your firewall." `
@@ -78,6 +79,7 @@ function Invoke-NetworkChecks {
         foreach ($c in $connList) {
             if (Test-IsUncommonRemotePort -Port $c.RemotePort) {
                 Add-Finding -Severity "WARNING" -Category "Network" `
+                    -RuleId "AIH-NET-UNCOMMON-REMOTE-PORT" -Key "$($c.Process)|${ip}:$($c.RemotePort)" `
                     -Title "Connection on Uncommon Port: $($c.Process) → ${ip}:$($c.RemotePort)" `
                     -Description "Process '$($c.Process)' (PID: $($c.PID)) has a connection to ${ip}:$($c.RemotePort). Low-numbered non-standard ports can indicate unusual protocols or C2 channels." `
                     -Remediation "Verify this connection is expected. Check the remote IP and port combination against known services." `
@@ -117,6 +119,7 @@ function Invoke-NetworkChecks {
                     $procs = ($externalIPs[$ip] | ForEach-Object { $_.Process }) -join ", "
 
                     Add-Finding -Severity $severity -Category "Network" `
+                        -RuleId "AIH-NET-MALICIOUS-IP" -Key "$ip" `
                         -Title "Known Malicious IP: $ip (Abuse Score: $($data.abuseConfidenceScore)%)" `
                         -Description "IP $ip has an abuse confidence score of $($data.abuseConfidenceScore)% on AbuseIPDB with $($data.totalReports) reports. Connected processes: $procs. ISP: $($data.isp), Country: $($data.countryCode)." `
                         -Remediation "Block this IP immediately in your firewall. Investigate the processes connecting to it. Consider this system potentially compromised." `
@@ -139,10 +142,12 @@ function Invoke-NetworkChecks {
         Write-Status "Checked $checkedCount IPs against AbuseIPDB."
     } elseif ($script:OfflineMode -and $externalIPs.Count -gt 0) {
         Add-Finding -Severity "INFO" -Category "Network" `
+            -RuleId "AIH-NET-INTEL-SKIPPED-OFFLINE" `
             -Title "Threat Intel Skipped (Offline Mode)" `
             -Description "Found $($externalIPs.Count) unique external IPs but offline mode is enabled. Re-run without -Offline for AbuseIPDB lookups."
     } elseif ($externalIPs.Count -gt 0) {
         Add-Finding -Severity "INFO" -Category "Network" `
+            -RuleId "AIH-NET-INTEL-SKIPPED-NO-KEY" `
             -Title "Threat Intel Skipped (No API Key)" `
             -Description "Found $($externalIPs.Count) unique external IPs but no AbuseIPDB API key is configured. Add your key to config.json for automatic threat intelligence lookups." `
             -Remediation "Get a free API key at https://www.abuseipdb.com/ and add it to config.json as 'AbuseIPDBKey'."
@@ -192,6 +197,7 @@ function Invoke-NetworkChecks {
         $addrStr = ($entry.Addresses | Sort-Object -Unique) -join ", "
 
         Add-Finding -Severity $severity -Category "Network" `
+            -RuleId "AIH-NET-UNUSUAL-LISTENER" -Key "$($entry.Port)|$($entry.Process)" `
             -Title "Unusual Listening Port: $($entry.Port) ($($entry.Process))" `
             -Description "Process '$($entry.Process)' (PID: $($entry.PID)) is listening on port $($entry.Port) on all interfaces ($addrStr). This port is not in the common/trusted list." `
             -Remediation "Verify this listener is expected. If you don't recognize the process or port, investigate further. Use 'netstat -ano | findstr $($entry.Port)' for details." `
@@ -225,6 +231,7 @@ function Invoke-NetworkChecks {
             $proc = $procLookup[$procId]
             $procName = if ($proc) { $proc.Name } else { "Unknown (PID: $procId)" }
             Add-Finding -Severity $check.Severity -Category "Network" `
+                -RuleId "AIH-NET-REMOTE-ACCESS-LISTENER" -Key "$($check.Port)" `
                 -Title $check.Title `
                 -Description "$($check.Description) Process: '$procName'." `
                 -Remediation $check.Remediation `
@@ -259,6 +266,7 @@ function Invoke-NetworkChecks {
     foreach ($dns in $seenDns.Keys) {
         $adapterList = $seenDns[$dns] | Sort-Object -Unique
         Add-Finding -Severity "WARNING" -Category "Network" `
+            -RuleId "AIH-NET-UNUSUAL-DNS-SERVER" -Key "$dns" `
             -Title "Unusual DNS Server: $dns" `
             -Description "DNS server $dns is configured on $($adapterList.Count) adapter(s): $($adapterList -join ', '). This is not a well-known public DNS provider. Malware sometimes changes DNS settings to redirect traffic." `
             -Remediation "Verify this DNS server is from your ISP or organization. If unexpected, change DNS to a known provider (8.8.8.8, 1.1.1.1, etc.) and investigate how it was changed." `
@@ -290,6 +298,7 @@ function Invoke-NetworkChecks {
 
             if ($blockedSecurity.Count -gt 0) {
                 Add-Finding -Severity "CRITICAL" -Category "Network" `
+                    -RuleId "AIH-NET-HOSTS-BLOCKS-SECURITY" `
                     -Title "Hosts File Blocking Security Sites" `
                     -Description "The hosts file maps security or update hosts (antivirus vendors, VirusTotal, Windows Update, Defender) to other addresses: $($blockedSecurity -join '; '). This is a common malware technique to prevent updates and block access to security tools." `
                     -Remediation "Remove the suspicious entries from $hostsPath. This is a strong indicator that malware has modified your system configuration." `
@@ -300,6 +309,7 @@ function Invoke-NetworkChecks {
                     -MITRE @("T1565.001")
             } else {
                 Add-Finding -Severity "INFO" -Category "Network" `
+                    -RuleId "AIH-NET-HOSTS-CUSTOM-ENTRIES" `
                     -Title "Custom Hosts File Entries ($($suspiciousEntries.Count) entries)" `
                     -Description "The hosts file contains $($suspiciousEntries.Count) custom entries beyond the defaults. While this may be intentional (ad blocking, development), it's worth reviewing." `
                     -Remediation "Review entries in $hostsPath and ensure they are all intentional." `
@@ -316,6 +326,7 @@ function Invoke-NetworkChecks {
         $proxyReg = Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings" -ErrorAction SilentlyContinue
         if ($proxyReg.ProxyEnable -eq 1) {
             Add-Finding -Severity "WARNING" -Category "Network" `
+                -RuleId "AIH-NET-SYSTEM-PROXY" -Key "$($proxyReg.ProxyServer)" `
                 -Title "System Proxy Enabled: $($proxyReg.ProxyServer)" `
                 -Description "A system-wide proxy is configured: '$($proxyReg.ProxyServer)'. If you didn't set this, malware may be intercepting your traffic." `
                 -Remediation "If you didn't configure this proxy, disable it: Settings > Network > Proxy. Then investigate how it was enabled." `
@@ -343,6 +354,7 @@ function Invoke-NetworkChecks {
             if (-not $pacUrl) { continue }
             $pacSeverity = Get-PacUrlSeverity -Url $pacUrl -FromPolicy $src.Policy
             Add-Finding -Severity $pacSeverity -Category "Network" `
+                -RuleId "AIH-NET-PAC-URL" -Key "$pacUrl" `
                 -Title "Proxy Auto-Config (PAC) URL Set: $pacUrl" `
                 -Description "$($src.Scope) setting '$($src.Path)' points the browser proxy configuration at the PAC script '$pacUrl'.$(if ($src.Policy) { ' It is delivered by policy, which is common in corporate networks.' }) A PAC script decides which proxy each request goes through, so adware and banking trojans use it to intercept traffic.$(if ($pacSeverity -eq 'CRITICAL') { ' The script is a local file, a raw IP address or in a user-writable location, which is typical of malware.' })" `
                 -Remediation "If you didn't configure this, turn off 'Use setup script' in Settings > Network & Internet > Proxy, or remove it: Remove-ItemProperty -Path '$($src.Path)' -Name AutoConfigURL" `
@@ -359,6 +371,7 @@ function Invoke-NetworkChecks {
         $winHttp = ConvertFrom-WinHttpSettings -Bytes $winHttpBlob
         if ($winHttp -and $winHttp.UsesProxy) {
             Add-Finding -Severity "WARNING" -Category "Network" `
+                -RuleId "AIH-NET-WINHTTP-PROXY" -Key "$($winHttp.Proxy)" `
                 -Title "WinHTTP Proxy Configured: $($winHttp.Proxy)" `
                 -Description "The machine-wide WinHTTP proxy is set to '$($winHttp.Proxy)'$(if ($winHttp.Bypass) { " (bypass: $($winHttp.Bypass))" }). Windows services and system components send traffic through it. This is normal on some corporate networks; elsewhere it can indicate traffic interception." `
                 -Remediation "Check the setting with 'netsh winhttp show proxy'. If you didn't configure it, reset it from an elevated prompt: netsh winhttp reset proxy" `
@@ -378,6 +391,7 @@ function Invoke-NetworkChecks {
         foreach ($profile in $fwProfiles) {
             if (-not $profile.Enabled) {
                 Add-Finding -Severity "CRITICAL" -Category "Network" `
+                    -RuleId "AIH-NET-FIREWALL-DISABLED" -Key "$($profile.Name)" `
                     -Title "Windows Firewall DISABLED: $($profile.Name) Profile" `
                     -Description "The Windows Firewall '$($profile.Name)' profile is disabled. This leaves the system exposed to network-based attacks." `
                     -Remediation "Enable the firewall immediately: Set-NetFirewallProfile -Profile $($profile.Name) -Enabled True" `

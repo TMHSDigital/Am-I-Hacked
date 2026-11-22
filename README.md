@@ -148,8 +148,8 @@ If it's a false positive, add a [suppression](#suppressing-false-positives) and 
 # Offline mode: no API calls (VirusTotal, AbuseIPDB)
 .\AmIHacked.ps1 -Offline
 
-# Export JSON alongside HTML
-.\AmIHacked.ps1 -ExportJson
+# Export JSON alongside HTML, and SARIF for CI tools
+.\AmIHacked.ps1 -ExportJson -ExportSarif
 
 # See which modules exist, then run only some of them
 .\AmIHacked.ps1 -ListModules
@@ -182,7 +182,8 @@ If it's a false positive, add a [suppression](#suppressing-false-positives) and 
 | `-BaselinePath` | Path to a specific baseline JSON |
 | `-CreateBaseline` | Snapshot current system state (prints the baseline's SHA-256) |
 | `-BaselineHash` | SHA-256 printed by `-CreateBaseline`; the baseline is ignored with a WARNING if it no longer matches |
-| `-ExportJson` | Emit findings as JSON alongside HTML |
+| `-ExportJson` | Emit findings as JSON alongside HTML (each finding has a stable `RuleId` and `Key`) |
+| `-ExportSarif` | Also write a SARIF 2.1.0 log for SARIF viewers and CI tools (rule IDs, severity levels, fingerprints) |
 | `-VerboseOutput` | Enable verbose console output (same as `-Verbose`) |
 | `-Redact` | Mask operator identity (computer name, username, paths) in all output |
 | `-CIMode` | Agent/CI-friendly output: suppress banner + browser, auto-redact, JSON summary on stdout, structured exit code |
@@ -274,6 +275,7 @@ The HTML report is a single self-contained file. It loads nothing from the netwo
 | **Filterable Findings** | Filter by severity, expand/collapse categories |
 | **Copy-Paste Remediation** | Click any PowerShell command to copy to clipboard |
 | **Technical Details** | JSON drill-down for every finding |
+| **Rule ID & Key** | Stable [rule ID](docs/RULES.md) and item key under each finding, ready to paste into a suppression |
 | **Dual Theme** | Professional default + "Terminal Mode" (CRT scanlines, glitch effects, neon glow) |
 | **Auto-Collapse** | INFO-only categories start collapsed to surface what matters |
 | **Print Support** | Clean print-optimized layout |
@@ -309,14 +311,17 @@ Then edit `config/config.json` (gitignored, so API keys stay local):
 
 ### Suppressing false positives
 
-Every environment has a few findings that are expected. Silence them by title (wildcards allowed) and record why:
+Every environment has a few findings that are expected. Each finding in the report shows its **rule ID** and **key** (the specific item). Silence one item, a whole rule, or match by title, and record why:
 
 ```jsonc
 "Suppressions": [
-  { "pattern": "New Listening Port: 6463", "reason": "Discord RPC, expected on this machine" },
-  { "pattern": "Unquoted Service Path*",  "reason": "Vendor bug, no write access to intermediate paths" }
+  { "rule": "AIH-BASE-NEW-PORT", "key": "6463", "reason": "Discord RPC, expected on this machine" },
+  { "rule": "AIH-PROC-UNQUOTED-SERVICE-PATH",    "reason": "Vendor bug, no write access to intermediate paths" },
+  { "pattern": "Autorun Entry: OneDrive*",        "reason": "Title wildcards still work" }
 ]
 ```
+
+Rule IDs are stable across releases, so suppressions keep working when a title's wording or numbers change. The full list is in [docs/RULES.md](docs/RULES.md).
 
 Suppressed findings are dropped before they're printed or stored. The count still appears in the summary and in the CI JSON (`suppressed`), so nothing disappears silently.
 
@@ -337,7 +342,7 @@ Suppressed findings are dropped before they're printed or stored. The count stil
 | `SuspiciousParentChild` | `object[]` | Parent→Child process rules |
 | `SuspiciousTempExtensions` | `string[]` | Extensions flagged in temp directories |
 | `TrustedAppDirs` | `string[]` | App directory names to skip during temp-dir scanning |
-| `Suppressions` | `object[]` | Findings to silence permanently. Each entry has a `pattern` (wildcard, matched against Title) and optional `reason` |
+| `Suppressions` | `object[]` | Findings to silence permanently. Each entry sets `rule` (rule ID) and optionally `key`, and/or `pattern` (title); wildcards allowed; optional `reason` |
 | `BackdoorPorts` | `int[]` | Ports that trigger CRITICAL instead of WARNING on listeners |
 | `KnownDNSServers` | `string[]` | DNS servers considered legitimate (Google, Cloudflare, etc.) |
 | `AbuseIPDBMaxChecks` | `int` | Max IPs to check against AbuseIPDB per scan (default: 30) |
@@ -477,7 +482,6 @@ All `.ps1` files must be saved as UTF-8 **with BOM** (Windows PowerShell 5.1 nee
 - Clipboard monitoring detection
 - Named pipe analysis
 - DLL search order hijacking (beyond COM)
-- SARIF export for code-scanning dashboards
 
 </details>
 
@@ -498,6 +502,8 @@ Am-I-Hacked/
 ├── lib/
 │   ├── Helpers.ps1               # Shared utilities, baseline, redaction, TUI
 │   └── ReportGenerator.ps1       # Self-contained HTML report generator
+├── docs/
+│   └── RULES.md                  # Rule ID catalog (checked against the code by the harness)
 ├── tests/
 │   ├── Invoke-MockScan.ps1       # Unit tests + mock IOC harness
 │   └── Invoke-StaticChecks.ps1   # BOM, parse, and PSScriptAnalyzer checks

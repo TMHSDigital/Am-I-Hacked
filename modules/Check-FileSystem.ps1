@@ -27,7 +27,7 @@ function Invoke-FileSystemChecks {
             & $check
         } catch {
             Write-Status "Error in ${check}: $_" -Color Yellow
-            Add-Finding -Severity "INFO" -Category "FileSystem" -Title "FileSystem Check Error: $check" `
+            Add-Finding -Severity "INFO" -Category "FileSystem" -RuleId "AIH-FS-CHECK-ERROR" -Key "$check" -Title "FileSystem Check Error: $check" `
                 -Description "The $check check stopped with an error: $_" `
                 -Remediation "The other FileSystem checks still ran. Re-run as Administrator, or report the error if it persists."
         }
@@ -63,6 +63,7 @@ function Test-RecentSystemBinary {
                     $suspiciousSystemFiles.Add($file) | Out-Null
 
                     Add-Finding -Severity "CRITICAL" -Category "FileSystem" `
+                        -RuleId "AIH-FS-MODIFIED-SYSTEM-EXE" -Key "$($file.FullName)" `
                         -Title "Modified Unsigned System Exe: $($file.Name)" `
                         -Description "File '$($file.FullName)' was modified within the last $maxAgeDays day(s) (Modified: $($file.LastWriteTime)) and is NOT digitally signed. Modification of system executables is extremely suspicious." `
                         -Remediation "This may indicate a system binary was replaced by malware (DLL hijacking/binary replacement). Run 'sfc /scannow' and compare the file hash against known-good values." `
@@ -85,6 +86,7 @@ function Test-RecentSystemBinary {
                 if (Test-SignatureUnknown $sig) { continue }
                 if (-not $sig -or $sig.Status -ne "Valid") {
                     Add-Finding -Severity "WARNING" -Category "FileSystem" `
+                        -RuleId "AIH-FS-MODIFIED-SYSTEM-DLL" -Key "$($file.FullName)" `
                         -Title "Modified Unsigned System DLL: $($file.Name)" `
                         -Description "DLL '$($file.FullName)' was modified within the last $maxAgeDays day(s) and lacks a valid signature. This could indicate DLL hijacking." `
                         -Remediation "Verify the file hash. Run 'sfc /scannow' to check system file integrity." `
@@ -193,6 +195,7 @@ function Test-TempFile {
                 $suspiciousFiles.Add($file) | Out-Null
 
                 Add-Finding -Severity $severity -Category "FileSystem" `
+                    -RuleId "AIH-FS-TEMP-FILE" -Key "$($file.FullName)" `
                     -Title "Suspicious File in Temp: $($file.Name)" `
                     -Description "Found '$($file.Name)' in '$($file.DirectoryName)'. $(if ($doubleExt) { 'WARNING: Double extension detected!' }) Size: $(Format-ByteSize $file.Length), Modified: $($file.LastWriteTime).$(if ($versionInfo -and $versionInfo.CompanyName) { " Company: $($versionInfo.CompanyName).$(if (-not $hasValidSig -and -not $sigUnknown -and (Test-IsTrustedCompany $versionInfo.CompanyName)) { ' UNSIGNED.' })" })" `
                     -Remediation "Investigate this file. Check its hash on VirusTotal. If you didn't create it, delete it." `
@@ -214,6 +217,7 @@ function Test-TempFile {
 
     if ($skippedSigned.Count -gt 0) {
         Add-Finding -Severity "INFO" -Category "FileSystem" `
+            -RuleId "AIH-FS-SIGNED-APP-FILES-SKIPPED" `
             -Title "Signed Files in App Directories: $($skippedSigned.Count) skipped" `
             -Description "$($skippedSigned.Count) validly signed files in known application directories were skipped. These are typically legitimate." `
             -Remediation "No action needed. Review the list if you suspect tampering." `
@@ -234,10 +238,12 @@ function Test-TempFile {
         Invoke-VirusTotalLookups -Files $vtCandidates -ApiKey $vtKey -MaxLookups ([int]$script:Config.MaxVTLookups)
     } elseif ($script:OfflineMode -and $vtCandidates.Count -gt 0) {
         Add-Finding -Severity "INFO" -Category "FileSystem" `
+            -RuleId "AIH-FS-VT-SKIPPED-OFFLINE" `
             -Title "VirusTotal Check Skipped (Offline Mode)" `
             -Description "Found $($vtCandidates.Count) unsigned executables in temp directories but offline mode is enabled."
     } elseif ($vtCandidates.Count -gt 0) {
         Add-Finding -Severity "INFO" -Category "FileSystem" `
+            -RuleId "AIH-FS-VT-SKIPPED-NO-KEY" `
             -Title "VirusTotal Check Skipped (No API Key)" `
             -Description "Found $($vtCandidates.Count) unsigned executables in temp directories but no VirusTotal API key is configured." `
             -Remediation "Get a free API key at https://www.virustotal.com/ and add it to config.json as 'VirusTotalAPIKey'."
@@ -274,6 +280,7 @@ function Test-AlternateDataStream {
                     }
 
                     Add-Finding -Severity $severity -Category "FileSystem" `
+                        -RuleId "AIH-FS-ALTERNATE-DATA-STREAM" -Key "$($file.FullName):$($stream.Stream)" `
                         -Title "Alternate Data Stream: $($file.Name):$($stream.Stream)" `
                         -Description "File '$($file.FullName)' has a hidden Alternate Data Stream named '$($stream.Stream)' ($($stream.Length) bytes). ADS can be used to hide malicious payloads within innocent-looking files." `
                         -Remediation "Inspect the stream content: Get-Content '$($file.FullName)' -Stream '$($stream.Stream)'. Remove with: Remove-Item '$($file.FullName)' -Stream '$($stream.Stream)'" `
@@ -315,6 +322,7 @@ function Test-InfoStealerArtifact {
 
             foreach ($archive in $stagingFiles) {
                 Add-Finding -Severity "CRITICAL" -Category "FileSystem" `
+                    -RuleId "AIH-FS-BROWSER-PROFILE-ARCHIVE" -Key "$($archive.FullName)" `
                     -Title "Suspicious Archive in Browser Profile: $($archive.Name)" `
                     -Description "Found archive '$($archive.Name)' ($(Format-ByteSize $archive.Length)) inside browser profile directory '$profileDir'. Info-stealers stage browser credential databases into archives for exfiltration." `
                     -Remediation "Investigate this file immediately. Check if your browser credentials have been exported. Change all saved passwords." `
@@ -338,6 +346,7 @@ function Test-InfoStealerArtifact {
         foreach ($f in $tempFiles) {
             if ($stealerPatterns -contains $f.Name.ToLower()) {
                 Add-Finding -Severity "CRITICAL" -Category "FileSystem" `
+                    -RuleId "AIH-FS-STEALER-OUTPUT" -Key "$($f.FullName)" `
                     -Title "Stealer Output File: $($f.Name)" `
                     -Description "Found '$($f.Name)' in temp directory. This filename matches common info-stealer output patterns used to stage stolen credentials for exfiltration." `
                     -Remediation "Examine this file's contents, then delete it. Change all affected passwords immediately." `
@@ -364,6 +373,7 @@ function Test-InfoStealerArtifact {
 
             if ($recentAccess.Count -gt 0) {
                 Add-Finding -Severity "WARNING" -Category "FileSystem" `
+                    -RuleId "AIH-FS-WALLET-ACCESS" -Key "$wp" `
                     -Title "Recent Crypto Wallet Access: $(Split-Path $wp -Leaf)" `
                     -Description "Wallet files in '$wp' were recently accessed ($($recentAccess.Count) files) but not recently modified. This can indicate credential harvesting by an info-stealer." `
                     -Remediation "Verify your wallet integrity. Consider moving funds to a new wallet generated on a clean system." `
@@ -416,6 +426,7 @@ function Test-AutorunPersistence {
 
                 if ($suspicious) {
                     Add-Finding -Severity $severity -Category "FileSystem" `
+                        -RuleId "AIH-FS-AUTORUN-SUSPICIOUS" -Key "$key\$($prop.Name)" `
                         -Title "Suspicious Autorun: $($prop.Name)" `
                         -Description "Registry key '$key' contains a suspicious autorun entry '$($prop.Name)' with value: '$value'. This persistence mechanism will execute every time the system/user starts." `
                         -Remediation "If you don't recognize this entry, remove it: Remove-ItemProperty -Path '$key' -Name '$($prop.Name)'" `
@@ -427,6 +438,7 @@ function Test-AutorunPersistence {
                         -MITRE @("T1547.001")
                 } else {
                     Add-Finding -Severity "INFO" -Category "FileSystem" `
+                        -RuleId "AIH-FS-AUTORUN" -Key "$key\$($prop.Name)" `
                         -Title "Autorun Entry: $($prop.Name)" `
                         -Description "Autorun at '$key': '$($prop.Name)' = '$value'" `
                         -Details @{
@@ -462,6 +474,7 @@ function Test-StartupFolder {
 
             foreach ($item in $startupItems) {
                 Add-Finding -Severity "WARNING" -Category "FileSystem" `
+                    -RuleId "AIH-FS-STARTUP-FOLDER" -Key "$($item.FullName)" `
                     -Title "Startup Folder Entry: $($item.Name)" `
                     -Description "Found '$($item.Name)' in startup folder '$startupFolder'. Files placed here execute automatically at user logon. Verify this is a legitimate application." `
                     -Remediation "If unexpected, remove: Remove-Item '$($item.FullName)'" `
@@ -492,6 +505,7 @@ function Test-AdvancedPersistence {
             $debugger = Get-ItemProperty $ifeoKey.PSPath -Name "Debugger" -ErrorAction SilentlyContinue
             if ($debugger -and $debugger.Debugger) {
                 Add-Finding -Severity "CRITICAL" -Category "FileSystem" `
+                    -RuleId "AIH-FS-IFEO-DEBUGGER" -Key "$($ifeoKey.PSChildName)" `
                     -Title "IFEO Debugger Hijack: $($ifeoKey.PSChildName)" `
                     -Description "Image File Execution Options for '$($ifeoKey.PSChildName)' has a Debugger set to '$($debugger.Debugger)'. This causes a different executable to run when the target is launched — a technique used for silent process injection and persistence." `
                     -Remediation "Remove-ItemProperty -Path '$($ifeoKey.PSPath)' -Name 'Debugger'" `
@@ -511,6 +525,7 @@ function Test-AdvancedPersistence {
         $appInitReg = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Windows" -ErrorAction SilentlyContinue
         if ($appInitReg -and $appInitReg.LoadAppInit_DLLs -eq 1 -and $appInitReg.AppInit_DLLs) {
             Add-Finding -Severity "CRITICAL" -Category "FileSystem" `
+                -RuleId "AIH-FS-APPINIT-DLLS" -Key "$($appInitReg.AppInit_DLLs)" `
                 -Title "AppInit_DLLs Loaded: $($appInitReg.AppInit_DLLs)" `
                 -Description "AppInit_DLLs is enabled and set to '$($appInitReg.AppInit_DLLs)'. These DLLs are loaded into every user-mode process, providing system-wide code injection — a powerful persistence and hooking mechanism." `
                 -Remediation "Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Windows' -Name 'LoadAppInit_DLLs' -Value 0" `
@@ -526,6 +541,7 @@ function Test-AdvancedPersistence {
         if ($winlogon) {
             if ($winlogon.Shell -and $winlogon.Shell -ne "explorer.exe") {
                 Add-Finding -Severity "CRITICAL" -Category "FileSystem" `
+                    -RuleId "AIH-FS-WINLOGON-SHELL" `
                     -Title "Winlogon Shell Hijacked" `
                     -Description "Winlogon Shell is set to '$($winlogon.Shell)' instead of 'explorer.exe'. This controls what runs as the user's desktop shell — modification is a strong persistence indicator." `
                     -Remediation "Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon' -Name 'Shell' -Value 'explorer.exe'" `
@@ -536,6 +552,7 @@ function Test-AdvancedPersistence {
             $expectedUserinit = "C:\Windows\system32\userinit.exe,"
             if ($winlogon.Userinit -and $winlogon.Userinit.Trim() -ne $expectedUserinit -and $winlogon.Userinit.Trim() -ne $expectedUserinit.TrimEnd(',')) {
                 Add-Finding -Severity "CRITICAL" -Category "FileSystem" `
+                    -RuleId "AIH-FS-WINLOGON-USERINIT" `
                     -Title "Winlogon Userinit Modified" `
                     -Description "Winlogon Userinit is set to '$($winlogon.Userinit)' instead of the default. Additional entries execute at every logon — a persistence technique." `
                     -Remediation "Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon' -Name 'Userinit' -Value '$expectedUserinit'" `
@@ -585,6 +602,7 @@ function Test-ComHijacking {
                     if ($comSig -and ($comSig.Status -eq "Valid" -or (Test-SignatureUnknown $comSig))) { continue }
 
                     Add-Finding -Severity "WARNING" -Category "FileSystem" `
+                        -RuleId "AIH-FS-COM-HIJACK" -Key "$($clsid.PSChildName)" `
                         -Title "COM Hijack: $($clsid.PSChildName)" `
                         -Description "User-level COM object '$($clsid.PSChildName)' points to unsigned DLL '$dllPath' outside standard system directories." `
                         -Remediation "Remove-Item -Path '$($clsid.PSPath)' -Recurse" `
@@ -629,6 +647,7 @@ function Test-WmiPersistence {
                 $filterNameLit = ([string]$binding.Filter.Name) -replace "'", "''"
                 $consumerNameLit = ([string]$binding.Consumer.Name) -replace "'", "''"
                 Add-Finding -Severity $nsSeverity -Category "FileSystem" `
+                    -RuleId "AIH-FS-WMI-BINDING" -Key "$ns|$filterRef|$consumerRef" `
                     -Title "WMI Persistence Binding Found$nsLabel" `
                     -Description "WMI event subscription binding detected in '$ns': Filter='$filterRef' Consumer='$consumerRef'. WMI persistence survives reboots and is nearly invisible to standard tools — heavily used by advanced threats." `
                     -Remediation "Get-CimInstance -Namespace '$ns' -ClassName __FilterToConsumerBinding | Where-Object { `$_.Filter.Name -eq '$filterNameLit' -and `$_.Consumer.Name -eq '$consumerNameLit' } | Remove-CimInstance" `
@@ -643,6 +662,7 @@ function Test-WmiPersistence {
             if ($wmiCmdConsumers.Count -gt 0) {
                 foreach ($consumer in $wmiCmdConsumers) {
                     Add-Finding -Severity $nsSeverity -Category "FileSystem" `
+                        -RuleId "AIH-FS-WMI-COMMANDLINE-CONSUMER" -Key "$ns|$($consumer.Name)" `
                         -Title "WMI CommandLine Consumer: $($consumer.Name)$nsLabel" `
                         -Description "WMI CommandLineEventConsumer '$($consumer.Name)' in '$ns' executes: '$($consumer.CommandLineTemplate)'. This will run automatically when the associated WMI event fires." `
                         -Remediation "Get-CimInstance -Namespace '$ns' -ClassName CommandLineEventConsumer -Filter `"Name='$($consumer.Name)'`" | Remove-CimInstance" `
@@ -654,6 +674,7 @@ function Test-WmiPersistence {
             if ($wmiScriptConsumers.Count -gt 0) {
                 foreach ($consumer in $wmiScriptConsumers) {
                     Add-Finding -Severity $nsSeverity -Category "FileSystem" `
+                        -RuleId "AIH-FS-WMI-SCRIPT-CONSUMER" -Key "$ns|$($consumer.Name)" `
                         -Title "WMI Script Consumer: $($consumer.Name)$nsLabel" `
                         -Description "WMI ActiveScriptEventConsumer '$($consumer.Name)' in '$ns' runs script code when triggered. This is a fileless persistence mechanism." `
                         -Remediation "Get-CimInstance -Namespace '$ns' -ClassName ActiveScriptEventConsumer -Filter `"Name='$($consumer.Name)'`" | Remove-CimInstance" `
@@ -675,6 +696,7 @@ function Test-WmiPersistence {
             $nsName = $nsObj.Name
             if ($nsName -notin $standardNamespaces) {
                 Add-Finding -Severity "WARNING" -Category "FileSystem" `
+                    -RuleId "AIH-FS-WMI-NAMESPACE" -Key "root\$nsName" `
                     -Title "Non-Standard WMI Namespace: root\$nsName" `
                     -Description "WMI namespace 'root\$nsName' is not a standard Windows namespace. Attackers create custom namespaces to store payloads and maintain persistence outside normal visibility." `
                     -Remediation "Investigate contents: Get-CimInstance -Namespace 'root\$nsName' -ClassName __Namespace -ErrorAction SilentlyContinue" `
@@ -743,6 +765,7 @@ function Test-ScheduledTask {
 
                     if ($suspicious) {
                         Add-Finding -Severity $severity -Category "FileSystem" `
+                            -RuleId "AIH-FS-SCHEDULED-TASK" -Key "$($task.TaskPath)$($task.TaskName)" `
                             -Title "Suspicious Scheduled Task: $($task.TaskName)" `
                             -Description "Scheduled task '$($task.TaskName)' (Path: $($task.TaskPath)) executes: '$execute' with arguments: '$taskArgs'. This task runs as: $($task.Principal.UserId)." `
                             -Remediation "If you don't recognize this task, disable it: Disable-ScheduledTask -TaskName '$($task.TaskName)' -TaskPath '$($task.TaskPath)'" `
@@ -794,6 +817,7 @@ function Test-GhostScheduledTask {
                     if ($id -and $id.Id) {
                         if (-not $sd) {
                             Add-Finding -Severity "CRITICAL" -Category "FileSystem" `
+                                -RuleId "AIH-FS-GHOST-TASK" -Key "$fullTaskPath" `
                                 -Title "Ghost Task (Missing SD): $fullTaskPath" `
                                 -Description "Scheduled task '$fullTaskPath' in the registry TaskCache has no Security Descriptor (SD value). Tasks without SD values are hidden from normal tools like Task Scheduler and schtasks. This is a known persistence technique." `
                                 -Remediation "Investigate the task GUID $($id.Id) in HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Schedule\TaskCache\Tasks\$($id.Id)" `
@@ -807,6 +831,7 @@ function Test-GhostScheduledTask {
 
                         if ($taskName -notin $apiTaskNames -and $fullTaskPath -notmatch '^\\Microsoft\\Windows\\') {
                             Add-Finding -Severity "WARNING" -Category "FileSystem" `
+                                -RuleId "AIH-FS-HIDDEN-TASK" -Key "$fullTaskPath" `
                                 -Title "Task Not Visible to API: $fullTaskPath" `
                                 -Description "Scheduled task '$fullTaskPath' exists in the registry TaskCache but was not returned by Get-ScheduledTask. This may indicate a tampered or hidden task." `
                                 -Remediation "Inspect the task registry entry at $($subKey.PSPath) and check the associated action in TaskCache\Tasks." `
@@ -874,6 +899,7 @@ function Test-BitsJob {
 
                 if ($suspicious) {
                     Add-Finding -Severity $severity -Category "FileSystem" `
+                        -RuleId "AIH-FS-BITS-JOB" -Key "$($job.DisplayName)" `
                         -Title "Suspicious BITS Job: $($job.DisplayName)" `
                         -Description "BITS transfer job '$($job.DisplayName)' flagged: $($reasons -join '; '). URL: '$url'. BITS jobs can be used for stealthy file downloads that survive reboots and bypass many security tools." `
                         -Remediation "Remove-BitsTransfer -BitsJob (Get-BitsTransfer -Name '$($job.DisplayName)' -AllUsers)" `
@@ -905,6 +931,7 @@ function Test-DefenderExclusion {
         $rawExclusions = @($prefs.ExclusionPath) + @($prefs.ExclusionProcess) + @($prefs.ExclusionExtension)
         if (@($rawExclusions | Where-Object { "$_" -match '^N/A:' }).Count -gt 0) {
             Add-Finding -Severity "INFO" -Category "FileSystem" `
+                -RuleId "AIH-FS-DEFENDER-EXCLUSIONS-UNREADABLE" `
                 -Title "Defender Exclusions Not Readable" `
                 -Description "Windows Defender only shows its exclusion lists to administrators, so exclusions could not be checked in this session." `
                 -Remediation "Re-run the scan from an elevated PowerShell session to inspect Defender exclusions." `
@@ -923,6 +950,7 @@ function Test-DefenderExclusion {
                 }
 
                 Add-Finding -Severity $severity -Category "FileSystem" `
+                    -RuleId "AIH-FS-DEFENDER-EXCLUSION-PATH" -Key "$path" `
                     -Title "Defender Exclusion (Path): $path" `
                     -Description "Windows Defender is configured to exclude path '$path' from scanning. Attackers commonly add exclusions to hide malware." `
                     -Remediation "If you didn't add this exclusion, remove it: Remove-MpPreference -ExclusionPath '$path'" `
@@ -934,6 +962,7 @@ function Test-DefenderExclusion {
         if ($exclusionProcesses.Count -gt 0) {
             foreach ($proc in $exclusionProcesses) {
                 Add-Finding -Severity "WARNING" -Category "FileSystem" `
+                    -RuleId "AIH-FS-DEFENDER-EXCLUSION-PROCESS" -Key "$proc" `
                     -Title "Defender Exclusion (Process): $proc" `
                     -Description "Windows Defender excludes process '$proc' from scanning." `
                     -Remediation "Remove if unexpected: Remove-MpPreference -ExclusionProcess '$proc'" `
@@ -945,6 +974,7 @@ function Test-DefenderExclusion {
         if ($exclusionExtensions.Count -gt 0) {
             foreach ($ext in $exclusionExtensions) {
                 Add-Finding -Severity "WARNING" -Category "FileSystem" `
+                    -RuleId "AIH-FS-DEFENDER-EXCLUSION-EXTENSION" -Key "$ext" `
                     -Title "Defender Exclusion (Extension): $ext" `
                     -Description "Windows Defender excludes all '*$ext' files from scanning." `
                     -Remediation "Remove if unexpected: Remove-MpPreference -ExclusionExtension '$ext'" `

@@ -80,7 +80,7 @@
   "AbuseIPDBMaxChecks": 30,
   "MaxVTLookups": 4,
   "Suppressions": [
-    { "pattern": "New Listening Port: 6463", "reason": "Discord RPC — expected on this machine" },
-    { "pattern": "Unquoted Service Path*", "reason": "Vendor bug, not exploitable — no write access to intermediate paths" }
+    { "rule": "AIH-BASE-NEW-PORT", "key": "6463", "reason": "Discord RPC — expected on this machine" },
+    { "rule": "AIH-PROC-UNQUOTED-SERVICE-PATH", "reason": "Vendor bug, not exploitable — no write access to intermediate paths" }
   ]
 }

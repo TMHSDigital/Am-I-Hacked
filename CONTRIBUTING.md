@@ -34,6 +34,7 @@ function Invoke-YourModuleNameChecks {
     # Your detection logic here
 
     Add-Finding -Severity "WARNING" -Category "YourModuleName" `
+        -RuleId "AIH-YOURAREA-SOMETHING-SUSPICIOUS" -Key $item.Path `
         -Title "Something Suspicious" `
         -Description "Explain what was found and why it matters." `
         -Remediation "Remove-Whatever -Name 'thing'" `
@@ -52,6 +53,7 @@ function Invoke-YourModuleNameChecks {
 - **Config access**: Reference `$script:Config` for whitelists and tuning parameters.
 - **Offline mode**: Check `$script:OfflineMode` before making API calls.
 - **No external dependencies**: PowerShell 5.1+ built-in cmdlets only.
+- **Rule IDs**: Every `Add-Finding` call needs a constant `-RuleId "AIH-<AREA>-<NAME>"` (uppercase, unique, never renamed once released) and, when the finding is about a specific item, a `-Key` that identifies it (file path, account, port, ...). Add each new rule ID to [docs/RULES.md](docs/RULES.md); the test harness fails if code and docs disagree.
 - **MITRE ATT&CK**: Every finding should include a `-MITRE @("T1xxx.xxx")` array of relevant technique IDs.
 - **Redaction**: Handled automatically by `Add-Finding`. Module authors do not need to mask sensitive data.
 - **Non-interactive mode**: `$script:NonInteractive` is set when `-CIMode` is used or the environment is non-interactive. Modules do not need to check this -- it's handled at the orchestrator level.

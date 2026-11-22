@@ -55,7 +55,7 @@ CI (`.github/workflows/ci.yml`) runs `tests/Invoke-StaticChecks.ps1` (BOM + pars
 
 ### Finding System
 
-All modules feed into a global `$script:Findings` ArrayList via the `Add-Finding` helper in `lib/Helpers.ps1`. Each finding carries: `Severity` (CRITICAL/WARNING/INFO), `Category`, `Title`, `Description`, `Remediation`, `Details`, and `MITRE` (string array of technique IDs).
+All modules feed into a global `$script:Findings` ArrayList via the `Add-Finding` helper in `lib/Helpers.ps1`. Each finding carries: `RuleId` (stable ID such as `AIH-FS-AUTORUN`, catalogued in `docs/RULES.md`), `Key` (the item the finding is about, e.g. a path or account), `Severity` (CRITICAL/WARNING/INFO), `Category`, `Title`, `Description`, `Remediation`, `Details`, and `MITRE` (string array of technique IDs). Every `Add-Finding` call passes a constant `-RuleId`; the harness checks that the IDs are unique and match `docs/RULES.md`. `-ExportSarif` writes the findings as SARIF 2.1.0 (`ConvertTo-SarifLog` in `lib/ReportGenerator.ps1`).
 
 ### Module System
 
@@ -78,7 +78,7 @@ Copied from `config/config.example.json`. Controls:
 - Optional API keys: VirusTotal (`VirusTotalAPIKey`), AbuseIPDB (`AbuseIPDBKey`)
 - Suspicious parent→child process rules
 - Per-module tuning parameters
-- `Suppressions`: array of `{ pattern, reason }` objects. Findings whose Title matches a pattern (wildcard via `-like`) are silently dropped before storing or printing. A `$script:SuppressedCount` counter tracks how many were suppressed; the count appears in the summary box and CI JSON output (`suppressed` key).
+- `Suppressions`: array of `{ pattern, rule, key, reason }` objects. A finding is silently dropped before storing or printing when every field the entry sets matches (`pattern` against the Title, `rule` against the RuleId, `key` against the Key; wildcards via `-like`; `key` alone matches nothing). Implemented in `Test-FindingSuppressed`. A `$script:SuppressedCount` counter tracks how many were suppressed; the count appears in the summary box and CI JSON output (`suppressed` key).
 
 `config/config.json` is gitignored to keep API keys local.
 

@@ -31,6 +31,8 @@
     Export a baseline snapshot of the current system state. Run this on a known-clean system first.
 .PARAMETER ExportJson
     Emit findings as a JSON file alongside the HTML report.
+.PARAMETER ExportSarif
+    Also write the findings as a SARIF 2.1.0 log (.sarif) with stable rule IDs and fingerprints.
 .PARAMETER VerboseOutput
     Enable verbose console output during scan (same as the common -Verbose switch).
 .PARAMETER Redact
@@ -59,6 +61,7 @@ param(
     [string]$BaselineHash = "",
     [switch]$CreateBaseline,
     [switch]$ExportJson,
+    [switch]$ExportSarif,
     [switch]$VerboseOutput,
     [switch]$Redact,
     [switch]$CIMode
@@ -182,7 +185,7 @@ if ($script:NonInteractive) {
 
 if (-not $isAdmin) {
     Write-Status "Running without admin - some checks will be limited." -Color Yellow
-    Add-Finding -Severity "INFO" -Category "General" -Title "Not Running as Administrator" `
+    Add-Finding -Severity "INFO" -Category "General" -RuleId "AIH-GEN-NOT-ADMIN" -Title "Not Running as Administrator" `
         -Description "Some checks require elevated privileges for full results. Re-run as Administrator for comprehensive analysis." `
         -Remediation "Right-click PowerShell > Run as Administrator, then re-run this script."
 }
@@ -222,12 +225,12 @@ if ('Baseline' -notin $SkipModules) {
         Write-Section "Baseline Comparison"
         Compare-Baseline -BaselinePath $defaultBaselinePath -ExpectedHash $BaselineHash
     } elseif ($BaselinePath) {
-        Add-Finding -Severity "WARNING" -Category "General" -Title "Baseline File Not Found" `
+        Add-Finding -Severity "WARNING" -Category "General" -RuleId "AIH-GEN-BASELINE-NOT-FOUND" -Title "Baseline File Not Found" `
             -Description "The baseline given with -BaselinePath does not exist: '$BaselinePath'. No baseline comparison was done." `
             -Remediation "Check the path, or create a baseline on a known-clean system with: .\AmIHacked.ps1 -CreateBaseline" `
             -MITRE @("T1565.001")
     } elseif (-not $CreateBaseline) {
-        Add-Finding -Severity "INFO" -Category "General" -Title "No Baseline Found" `
+        Add-Finding -Severity "INFO" -Category "General" -RuleId "AIH-GEN-NO-BASELINE" -Title "No Baseline Found" `
             -Description "No baseline snapshot exists for comparison. Run with -CreateBaseline on a known-clean system to enable change detection on future scans." `
             -Remediation ".\AmIHacked.ps1 -CreateBaseline"
     }
@@ -239,6 +242,7 @@ Import-Module Microsoft.PowerShell.Security -Force -ErrorAction SilentlyContinue
 $script:SignatureCheckAvailable = $null -ne (Get-Command Get-AuthenticodeSignature -ErrorAction SilentlyContinue)
 if (-not $script:SignatureCheckAvailable) {
     Add-Finding -Severity "WARNING" -Category "General" `
+        -RuleId "AIH-GEN-SIGNATURES-DEGRADED" `
         -Title "Signature Verification Degraded" `
         -Description "The PowerShell Security module (Microsoft.PowerShell.Security) could not be loaded in this session. Authenticode signature checks are skipped, and files whose signature could not be verified are not flagged as unsigned. Affected checks: AMSI DLL integrity, COM hijack detection, unsigned process/file detection." `
         -Remediation "Run the scan in a fresh PowerShell session. If the issue persists, run 'sfc /scannow' to repair PowerShell modules."
@@ -275,7 +279,7 @@ foreach ($mod in $discoveredModules) {
         Write-Host "X" -NoNewline -ForegroundColor Red
         Write-Host "] " -NoNewline -ForegroundColor DarkGray
         Write-Host (Invoke-Redact "ERROR in $($mod.Name): $_") -ForegroundColor Red
-        Add-Finding -Severity "INFO" -Category $mod.Name -Title "Module Error" `
+        Add-Finding -Severity "INFO" -Category $mod.Name -RuleId "AIH-GEN-MODULE-ERROR" -Key "$($mod.Name)" -Title "Module Error" `
             -Description "The $($mod.Description) module encountered an error: $_" `
             -Remediation "Check that all dependencies are available and you have appropriate permissions."
     }
@@ -317,6 +321,12 @@ if ($ExportJson) {
         Duration   = $duration.TotalSeconds
     } | ConvertTo-Json -Depth 5 | Set-Content $jsonFile -Encoding UTF8
     Write-Status "JSON export saved to: $jsonFile" -Color Green
+}
+
+if ($ExportSarif) {
+    $sarifFile = Join-Path $OutputPath "AmIHacked_$timestamp.sarif"
+    Export-SarifReport -Findings @($script:Findings) -OutputFile $sarifFile -Version $script:Version
+    Write-Status "SARIF export saved to: $(Invoke-Redact $sarifFile)" -Color Green
 }
 
 # ── Baseline Snapshot (only when explicitly requested) ───────────────────────

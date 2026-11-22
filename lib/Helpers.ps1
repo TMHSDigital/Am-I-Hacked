@@ -204,6 +204,47 @@ function Get-RedactedValue {
 
 # ── Finding Management ───────────────────────────────────────────────────────
 
+function Get-FallbackRuleId {
+    <#
+        Rule ID for findings from modules that don't pass -RuleId (e.g. third-party modules):
+        CUSTOM-<CATEGORY>-<static part of the title>, e.g. "Odd Thing: x (3)" -> CUSTOM-FOO-ODD-THING.
+    #>
+    param([string]$Category, [string]$Title)
+    $stem = (($Title -split '[:(]')[0] -replace '[^A-Za-z0-9]+', '-').Trim('-').ToUpperInvariant()
+    $cat = ($Category -replace '[^A-Za-z0-9]+', '').ToUpperInvariant()
+    if (-not $stem) { $stem = "FINDING" }
+    return "CUSTOM-$cat-$stem"
+}
+
+function Test-WildcardMatch {
+    <# Case-insensitive -like that also accepts an exact match, so keys containing [ ] still match literally. #>
+    param([string]$Value, [string]$Pattern)
+    if ($Value -eq $Pattern) { return $true }
+    try { return [bool]($Value -like $Pattern) } catch { return $false }
+}
+
+function Test-FindingSuppressed {
+    <#
+        A suppression entry silences a finding when every field it sets matches:
+          pattern - wildcard against the Title (original format)
+          rule    - wildcard against the RuleId
+          key     - wildcard against the Key (only together with pattern or rule)
+    #>
+    param([string]$Title, [string]$RuleId, [string]$Key, [object[]]$Suppressions)
+    foreach ($sup in @($Suppressions)) {
+        if ($null -eq $sup) { continue }
+        $pattern = [string]$sup.pattern
+        $rule = [string]$sup.rule
+        $keyPattern = [string]$sup.key
+        if (-not $pattern -and -not $rule) { continue }
+        if ($pattern -and -not (Test-WildcardMatch $Title $pattern)) { continue }
+        if ($rule -and -not (Test-WildcardMatch $RuleId $rule)) { continue }
+        if ($keyPattern -and -not (Test-WildcardMatch $Key $keyPattern)) { continue }
+        return $true
+    }
+    return $false
+}
+
 function Add-Finding {
     param(
         [ValidateSet("CRITICAL","WARNING","INFO")]
@@ -213,24 +254,27 @@ function Add-Finding {
         [string]$Description,
         [string]$Remediation = "",
         [object]$Details = $null,
-        [string[]]$MITRE = @()
+        [string[]]$MITRE = @(),
+        # Stable rule ID (see docs/RULES.md) and the instance it applies to (path, account, port, ...)
+        [string]$RuleId = "",
+        [string]$Key = ""
     )
 
+    if (-not $RuleId) { $RuleId = Get-FallbackRuleId -Category $Category -Title $Title }
     $Title       = Invoke-Redact $Title
     $Description = Invoke-Redact $Description
     $Remediation = Invoke-Redact $Remediation
+    $Key         = Invoke-Redact $Key
     $Details     = Get-RedactedValue $Details
 
-    if ($script:Config.Suppressions) {
-        foreach ($sup in $script:Config.Suppressions) {
-            if ($Title -like $sup.pattern) {
-                $script:SuppressedCount++
-                return
-            }
-        }
+    if (Test-FindingSuppressed -Title $Title -RuleId $RuleId -Key $Key -Suppressions $script:Config.Suppressions) {
+        $script:SuppressedCount++
+        return
     }
 
     $finding = [PSCustomObject]@{
+        RuleId      = $RuleId
+        Key         = $Key
         Severity    = $Severity
         Category    = $Category
         Title       = $Title
@@ -637,6 +681,7 @@ function Invoke-VirusTotalLookups {
                 $severity = if ($detections -ge 5) { "CRITICAL" } else { "WARNING" }
 
                 Add-Finding -Severity $severity -Category "FileSystem" `
+                    -RuleId "AIH-FS-VT-DETECTION" -Key "$($file.FullName)" `
                     -Title "VirusTotal Detection: $($file.Name) ($detections engines)" `
                     -Description "File '$($file.Name)' (SHA256: $hash) is flagged by $detections VirusTotal engines ($($stats.malicious) malicious, $($stats.suspicious) suspicious out of $($stats.undetected + $detections) total)." `
                     -Remediation "Delete this file immediately. Run a full system scan. Consider this system potentially compromised." `
@@ -656,6 +701,7 @@ function Invoke-VirusTotalLookups {
             $status = Get-HttpStatusCode $_
             if ($status -eq 404) {
                 Add-Finding -Severity "INFO" -Category "FileSystem" `
+                    -RuleId "AIH-FS-VT-UNKNOWN" -Key "$($file.FullName)" `
                     -Title "Unknown to VirusTotal: $($file.Name)" `
                     -Description "File '$($file.Name)' hash is not in the VirusTotal database. This means it's either very new, custom-built, or rarely seen — which can be suspicious for executables." `
                     -Details @{ Path = $file.FullName }
@@ -1075,6 +1121,7 @@ function Compare-Baseline {
         $actualHash = (Get-FileHash -Path $BaselinePath -Algorithm SHA256).Hash
         if ($ExpectedHash -and $actualHash -ne $ExpectedHash.Trim().ToUpperInvariant()) {
             Add-Finding -Severity "WARNING" -Category "Baseline" `
+                -RuleId "AIH-BASE-HASH-MISMATCH" `
                 -Title "Baseline Hash Mismatch" `
                 -Description "The baseline file '$BaselinePath' has SHA-256 $actualHash, but -BaselineHash expected $($ExpectedHash.Trim().ToUpperInvariant()). The baseline was changed or replaced after it was created, so it was not used for comparison." `
                 -Remediation "Restore the baseline from an off-machine copy, or create a new one on a known-clean system with -CreateBaseline." `
@@ -1090,6 +1137,7 @@ function Compare-Baseline {
             $lastWrite = (Get-Item $BaselinePath).LastWriteTime
             if ($lastWrite -gt $created.ToLocalTime().AddMinutes(5)) {
                 Add-Finding -Severity "INFO" -Category "Baseline" `
+                    -RuleId "AIH-BASE-MODIFIED" `
                     -Title "Baseline Modified After Creation" `
                     -Description "The baseline file '$BaselinePath' was last written on $lastWrite, after the snapshot it contains was taken ($($created.ToLocalTime())). If you did not edit or copy it, it may have been tampered with." `
                     -Remediation "Verify the baseline with -BaselineHash, or recreate it on a known-clean system with -CreateBaseline." `
@@ -1121,6 +1169,7 @@ function Compare-Baseline {
         $newPorts = $currentPorts | Where-Object { $_ -notin $oldPorts -and $_ -lt 49152 }  # skip ephemeral range
         foreach ($port in $newPorts) {
             Add-Finding -Severity "WARNING" -Category "Baseline" `
+                -RuleId "AIH-BASE-NEW-PORT" -Key "$port" `
                 -Title "New Listening Port: $port" `
                 -Description "Port $port was not listening in the baseline scan from $($old.Timestamp). This may indicate a newly installed service or backdoor." `
                 -Remediation "Investigate what process is listening on this port: Get-NetTCPConnection -LocalPort $port -State Listen" `
@@ -1134,6 +1183,7 @@ function Compare-Baseline {
             if ($svc.Name -match '_[0-9a-f]{5,}$') { continue }  # skip per-user session service instances (e.g. AarSvc_ddff8)
             if ($svc.Name -notin $oldSvcNames) {
                 Add-Finding -Severity "WARNING" -Category "Baseline" `
+                    -RuleId "AIH-BASE-NEW-SERVICE" -Key "$($svc.Name)" `
                     -Title "New Service: $($svc.Name)" `
                     -Description "Service '$($svc.DisplayName)' ($($svc.Name)) was not present in the baseline. Path: '$($svc.PathName)'." `
                     -Remediation "Verify this service is legitimate: Get-Service '$($svc.Name)' | Format-List *" `
@@ -1147,6 +1197,7 @@ function Compare-Baseline {
         foreach ($acct in $currentAccounts) {
             if ($acct.Name -notin $oldAccounts) {
                 Add-Finding -Severity "CRITICAL" -Category "Baseline" `
+                    -RuleId "AIH-BASE-NEW-ACCOUNT" -Key "$($acct.Name)" `
                     -Title "New Local Account: $($acct.Name)" `
                     -Description "Account '$($acct.Name)' did not exist in the baseline from $($old.Timestamp). Unauthorized account creation is a strong compromise indicator." `
                     -Remediation "If unexpected, disable immediately: Disable-LocalUser -Name '$($acct.Name)'" `
@@ -1164,6 +1215,7 @@ function Compare-Baseline {
                     $fullKey = "$keyPath\$($_.Name)"
                     if ($fullKey -notin $oldRunEntries) {
                         Add-Finding -Severity "WARNING" -Category "Baseline" `
+                            -RuleId "AIH-BASE-NEW-AUTORUN" -Key "$keyPath\$($_.Name)" `
                             -Title "New Autorun Entry: $($_.Name)" `
                             -Description "Autorun entry '$($_.Name)' at '$keyPath' was not present in the baseline. Value: '$($_.Value)'." `
                             -Remediation "If unexpected, remove: Remove-ItemProperty -Path '$keyPath' -Name '$($_.Name)'" `
@@ -1188,6 +1240,7 @@ function Compare-Baseline {
                 $signature = Get-TaskActionSignature $task.Actions
                 if (-not $oldTasks.ContainsKey($taskKey)) {
                     Add-Finding -Severity "WARNING" -Category "Baseline" `
+                        -RuleId "AIH-BASE-NEW-TASK" -Key "$taskKey" `
                         -Title "New Scheduled Task: $taskKey" `
                         -Description "Scheduled task '$taskKey' was not present in the baseline from $($old.Timestamp). Actions: '$signature'." `
                         -Remediation "If unexpected, disable it: Disable-ScheduledTask -TaskName '$($task.TaskName)' -TaskPath '$($task.TaskPath)'" `
@@ -1195,6 +1248,7 @@ function Compare-Baseline {
                         -MITRE @("T1053.005")
                 } elseif ($oldTasks[$taskKey] -ne $signature) {
                     Add-Finding -Severity "WARNING" -Category "Baseline" `
+                        -RuleId "AIH-BASE-TASK-ACTION-CHANGED" -Key "$taskKey" `
                         -Title "Scheduled Task Action Changed: $taskKey" `
                         -Description "The actions of scheduled task '$taskKey' changed since the baseline from $($old.Timestamp). Before: '$($oldTasks[$taskKey])'. Now: '$signature'." `
                         -Remediation "Verify the new action is legitimate. If not, disable the task: Disable-ScheduledTask -TaskName '$($task.TaskName)' -TaskPath '$($task.TaskPath)'" `
@@ -1219,6 +1273,7 @@ function Compare-Baseline {
                     foreach ($value in @(Select-MpExclusion $et.Current)) {
                         if ($value -notin $oldValues) {
                             Add-Finding -Severity "WARNING" -Category "Baseline" `
+                                -RuleId "AIH-BASE-NEW-EXCLUSION" -Key "$($et.Type)|$value" `
                                 -Title "New Defender Exclusion ($($et.Type)): $value" `
                                 -Description "Defender exclusion '$value' ($($et.Type)) was not present in the baseline from $($old.Timestamp). Attackers add exclusions to hide malware from scanning." `
                                 -Remediation "If you didn't add it, remove it: Remove-MpPreference -$($et.Param) '$value'" `

@@ -20,6 +20,7 @@ function Invoke-DefenseEvasionChecks {
                 $clearInfo = ConvertFrom-LogClearedXml $evt.ToXml()
 
                 Add-Finding -Severity $severity -Category "DefenseEvasion" `
+                    -RuleId "AIH-DE-SECURITY-LOG-CLEARED" -Key "$($evt.TimeCreated.ToString('yyyy-MM-ddTHH:mm:ss'))" `
                     -Title "Security Event Log Cleared: $($evt.TimeCreated.ToString('yyyy-MM-dd HH:mm'))" `
                     -Description "The Security event log was cleared on $($evt.TimeCreated). Attackers clear logs to cover their tracks. Account: $($clearInfo.Account)." `
                     -Remediation "Investigate what happened around this time. Check other log sources (Application, System, PowerShell) for correlated activity." `
@@ -38,6 +39,7 @@ function Invoke-DefenseEvasionChecks {
                 $clearInfo = ConvertFrom-LogClearedXml $evt.ToXml()
                 $clearedLog = if ($clearInfo.Channel) { $clearInfo.Channel } else { "unknown" }
                 Add-Finding -Severity "WARNING" -Category "DefenseEvasion" `
+                    -RuleId "AIH-DE-EVENT-LOG-CLEARED" -Key "$clearedLog|$($evt.TimeCreated.ToString('yyyy-MM-ddTHH:mm:ss'))" `
                     -Title "Event Log Cleared: $clearedLog ($($evt.TimeCreated.ToString('yyyy-MM-dd')))" `
                     -Description "The '$clearedLog' event log was cleared on $($evt.TimeCreated) by account: $(if ($clearInfo.Account) { $clearInfo.Account } else { 'unknown' })." `
                     -Remediation "Investigate why this log was cleared. Cross-reference with other system activity." `
@@ -57,6 +59,7 @@ function Invoke-DefenseEvasionChecks {
         $disableAS = Get-ItemProperty "HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender" -Name "DisableAntiSpyware" -ErrorAction SilentlyContinue
         if ($disableAS -and $disableAS.DisableAntiSpyware -eq 1) {
             Add-Finding -Severity "CRITICAL" -Category "DefenseEvasion" `
+                -RuleId "AIH-DE-DEFENDER-POLICY-DISABLED" `
                 -Title "Windows Defender Disabled via Policy" `
                 -Description "Registry key 'DisableAntiSpyware' is set to 1. This completely disables Windows Defender. Malware commonly sets this to blind the system's primary AV." `
                 -Remediation "Remove-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender' -Name 'DisableAntiSpyware'" `
@@ -74,6 +77,7 @@ function Invoke-DefenseEvasionChecks {
             Write-Status "AMSI signature check unavailable (PS.Security module could not be loaded)." -Color DarkGray
         } elseif (-not $sig -or $sig.Status -ne "Valid") {
             Add-Finding -Severity "CRITICAL" -Category "DefenseEvasion" `
+                -RuleId "AIH-DE-AMSI-DLL-SIGNATURE" `
                 -Title "AMSI DLL Signature Invalid" `
                 -Description "amsi.dll at '$amsiDll' does not have a valid digital signature (Status: $(if ($sig) { $sig.Status } else { 'Missing' })). This may indicate the AMSI interface has been tampered with to bypass script scanning." `
                 -Remediation "Run 'sfc /scannow' to restore the legitimate amsi.dll. Investigate how it was modified." `
@@ -86,6 +90,7 @@ function Invoke-DefenseEvasionChecks {
         $amsiProviders = Get-ChildItem "HKLM:\SOFTWARE\Microsoft\AMSI\Providers" -ErrorAction SilentlyContinue
         if (-not $amsiProviders -or $amsiProviders.Count -eq 0) {
             Add-Finding -Severity "CRITICAL" -Category "DefenseEvasion" `
+                -RuleId "AIH-DE-AMSI-NO-PROVIDERS" `
                 -Title "No AMSI Providers Registered" `
                 -Description "No AMSI providers found in the registry. This means script-based malware (PowerShell, VBScript, JScript) cannot be scanned at runtime." `
                 -Remediation "Re-register Windows Defender as an AMSI provider. Run 'sfc /scannow' and ensure Defender is properly installed." `
@@ -99,6 +104,7 @@ function Invoke-DefenseEvasionChecks {
         $amsiEnable = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows Script\Settings" -Name "AmsiEnable" -ErrorAction SilentlyContinue
         if ($amsiEnable -and $amsiEnable.AmsiEnable -eq 0) {
             Add-Finding -Severity "CRITICAL" -Category "DefenseEvasion" `
+                -RuleId "AIH-DE-AMSI-DISABLED" `
                 -Title "AMSI Explicitly Disabled via Registry" `
                 -Description "HKLM:\SOFTWARE\Microsoft\Windows Script\Settings!AmsiEnable is set to 0. This explicitly disables AMSI for Windows Script Host (VBScript, JScript), allowing malicious scripts to run without AV scanning." `
                 -Remediation "Remove-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows Script\Settings' -Name 'AmsiEnable'" `
@@ -113,6 +119,7 @@ function Invoke-DefenseEvasionChecks {
         $sbl = Get-ItemProperty "HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging" -ErrorAction SilentlyContinue
         if (-not $sbl -or -not $sbl.EnableScriptBlockLogging -or $sbl.EnableScriptBlockLogging -eq 0) {
             Add-Finding -Severity "INFO" -Category "DefenseEvasion" `
+                -RuleId "AIH-DE-PS-SCRIPTBLOCK-LOGGING" `
                 -Title "PowerShell Script Block Logging Not Enabled" `
                 -Description "Script block logging is not enabled via policy. When enabled, PowerShell logs all executed script blocks to the event log (Event ID 4104), which is valuable for detecting obfuscated or malicious scripts." `
                 -Remediation "Set-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging' -Name EnableScriptBlockLogging -Value 1" `
@@ -127,6 +134,7 @@ function Invoke-DefenseEvasionChecks {
         $ml = Get-ItemProperty "HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ModuleLogging" -ErrorAction SilentlyContinue
         if (-not $ml -or -not $ml.EnableModuleLogging -or $ml.EnableModuleLogging -eq 0) {
             Add-Finding -Severity "INFO" -Category "DefenseEvasion" `
+                -RuleId "AIH-DE-PS-MODULE-LOGGING" `
                 -Title "PowerShell Module Logging Not Enabled" `
                 -Description "Module logging is not enabled via policy. When enabled, PowerShell logs pipeline execution details to the event log (Event ID 4103), helping detect malicious module usage." `
                 -Remediation "Set-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ModuleLogging' -Name EnableModuleLogging -Value 1" `
@@ -141,6 +149,7 @@ function Invoke-DefenseEvasionChecks {
         $transcript = Get-ItemProperty "HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\Transcription" -ErrorAction SilentlyContinue
         if (-not $transcript -or -not $transcript.EnableTranscripting -or $transcript.EnableTranscripting -eq 0) {
             Add-Finding -Severity "INFO" -Category "DefenseEvasion" `
+                -RuleId "AIH-DE-PS-TRANSCRIPTION" `
                 -Title "PowerShell Transcription Not Enabled" `
                 -Description "PowerShell transcription is not enabled via policy. When enabled, PowerShell logs all input and output to text files, providing a full audit trail of PowerShell activity on the system." `
                 -Remediation "Set-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\Transcription' -Name EnableTranscripting -Value 1" `
@@ -165,6 +174,7 @@ function Invoke-DefenseEvasionChecks {
         }
         if ($mpStatus -and $otherAV.Count -gt 0) {
             Add-Finding -Severity "INFO" -Category "DefenseEvasion" `
+                -RuleId "AIH-DE-DEFENDER-PASSIVE" -Key "$($otherAV -join ', ')" `
                 -Title "Defender Passive; $($otherAV -join ', ') Active" `
                 -Description "Windows Defender is not providing real-time protection (running mode: $(if ($runningMode) { $runningMode } else { 'unknown' })), but another antivirus product is registered and enabled with Windows Security Center: $($otherAV -join ', '). Windows switches Defender to passive mode when a third-party antivirus is installed." `
                 -Remediation "No action needed if you installed $($otherAV -join ', ') yourself. If you did not, investigate the product and check Windows Security > Virus & threat protection." `
@@ -178,6 +188,7 @@ function Invoke-DefenseEvasionChecks {
         } elseif ($mpStatus) {
             if (-not $mpStatus.RealTimeProtectionEnabled) {
                 Add-Finding -Severity "CRITICAL" -Category "DefenseEvasion" `
+                    -RuleId "AIH-DE-DEFENDER-REALTIME-DISABLED" `
                     -Title "Defender Real-Time Protection Disabled" `
                     -Description "Windows Defender real-time protection is disabled. The system has no active malware scanning." `
                     -Remediation "Set-MpPreference -DisableRealtimeMonitoring `$false" `
@@ -191,6 +202,7 @@ function Invoke-DefenseEvasionChecks {
 
             if (-not $mpStatus.AntivirusEnabled) {
                 Add-Finding -Severity "CRITICAL" -Category "DefenseEvasion" `
+                    -RuleId "AIH-DE-ANTIVIRUS-DISABLED" `
                     -Title "Antivirus Engine Disabled" `
                     -Description "The Windows Defender antivirus engine is disabled." `
                     -Remediation "Re-enable Defender through Windows Security settings or Group Policy." `
@@ -200,6 +212,7 @@ function Invoke-DefenseEvasionChecks {
             $sigAge = $mpStatus.AntivirusSignatureAge
             if ($sigAge -gt 7) {
                 Add-Finding -Severity "WARNING" -Category "DefenseEvasion" `
+                    -RuleId "AIH-DE-DEFENDER-SIGNATURES-OUTDATED" `
                     -Title "Defender Signatures Outdated ($sigAge days)" `
                     -Description "Antivirus definitions are $sigAge days old. Outdated signatures miss recent threats. Malware sometimes blocks update mechanisms." `
                     -Remediation "Update-MpSignature" `
@@ -219,6 +232,7 @@ function Invoke-DefenseEvasionChecks {
         $etwSecurity = Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\WMI\Autologger\EventLog-Security" -Name "Start" -ErrorAction SilentlyContinue
         if ($etwSecurity -and $etwSecurity.Start -ne 1) {
             Add-Finding -Severity "CRITICAL" -Category "DefenseEvasion" `
+                -RuleId "AIH-DE-ETW-SECURITY-AUTOLOGGER" `
                 -Title "Security ETW Autologger Disabled" `
                 -Description "The Security event log ETW autologger has been disabled (Start=$($etwSecurity.Start)). This prevents security events from being recorded, blinding audit and detection capabilities." `
                 -Remediation "Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\WMI\Autologger\EventLog-Security' -Name 'Start' -Value 1" `
@@ -238,6 +252,7 @@ function Invoke-DefenseEvasionChecks {
             $loggerReg = Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\WMI\Autologger\$logger" -Name "Start" -ErrorAction SilentlyContinue
             if ($loggerReg -and $loggerReg.Start -ne 1) {
                 Add-Finding -Severity "WARNING" -Category "DefenseEvasion" `
+                    -RuleId "AIH-DE-ETW-AUTOLOGGER" -Key "$logger" `
                     -Title "ETW Autologger Disabled: $logger" `
                     -Description "The $logger ETW autologger has been disabled. This reduces system audit coverage." `
                     -Remediation "Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\WMI\Autologger\$logger' -Name 'Start' -Value 1" `
@@ -256,6 +271,7 @@ function Invoke-DefenseEvasionChecks {
         $tamperProtection = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows Defender\Features" -Name "TamperProtection" -ErrorAction SilentlyContinue
         if ($tamperProtection -and $tamperProtection.TamperProtection -ne 5) {
             Add-Finding -Severity "WARNING" -Category "DefenseEvasion" `
+                -RuleId "AIH-DE-TAMPER-PROTECTION" `
                 -Title "Tamper Protection Not Fully Enabled" `
                 -Description "Windows Defender Tamper Protection is not in the expected state (Value: $($tamperProtection.TamperProtection), Expected: 5). This makes it easier for malware to disable Defender." `
                 -Remediation "Enable Tamper Protection through Windows Security > Virus & threat protection settings." `
@@ -309,6 +325,7 @@ function Invoke-DefenseEvasionChecks {
             if ($matched) {
                 $fileInfo = Get-Item $profile.Path -ErrorAction SilentlyContinue
                 Add-Finding -Severity "WARNING" -Category "DefenseEvasion" `
+                    -RuleId "AIH-DE-PS-PROFILE" -Key "$($profile.Path)" `
                     -Title "Suspicious PowerShell Profile: $($profile.Name)" `
                     -Description "The PowerShell profile '$($profile.Name)' (owner: $($profile.Owner)) at '$($profile.Path)' contains suspicious patterns. Attackers inject code into PS profiles to execute malicious commands on every PowerShell session. Matched patterns: $($matched -join ', ')." `
                     -Remediation "Review the profile content: Get-Content '$($profile.Path)'. Remove suspicious lines or rename the file." `
@@ -366,6 +383,7 @@ function Invoke-DefenseEvasionChecks {
             if (-not $isKnown) {
                 $displayName = Get-CertDisplayName $cert.Subject
                 Add-Finding -Severity "WARNING" -Category "DefenseEvasion" `
+                    -RuleId "AIH-DE-UNKNOWN-ROOT-CA" -Key "$($cert.Thumbprint)" `
                     -Title "Unknown Root CA: $displayName" `
                     -Description "Root certificate '$($cert.Subject)' in LocalMachine\Root is not distributed by the Microsoft Trusted Root Program, shipped with Windows, or deployed by Group Policy. This could be a root added by installed software or a corporate proxy (benign), or a rogue certificate installed by malware to intercept HTTPS traffic via MITM." `
                     -Remediation "Review the certificate in certlm.msc. If unexpected, remove it: certutil -delstore Root $($cert.Thumbprint)" `

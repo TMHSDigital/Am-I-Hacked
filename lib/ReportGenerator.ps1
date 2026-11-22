@@ -123,6 +123,13 @@ function Generate-HtmlReport {
 
             $escapedDescription = $finding.Description -replace '<','&lt;' -replace '>','&gt;'
 
+            $ruleHtml = ""
+            if ($finding.RuleId) {
+                $ruleHtml = "<div class='finding-rule' title='Use these in config Suppressions as rule / key'>rule <code>$([System.Net.WebUtility]::HtmlEncode($finding.RuleId))</code>"
+                if ($finding.Key) { $ruleHtml += " &middot; key <code>$([System.Net.WebUtility]::HtmlEncode($finding.Key))</code>" }
+                $ruleHtml += "</div>"
+            }
+
             $findingsHtml += @"
                 <div class="finding finding-$sevClass" data-severity="$sevClass">
                     <div class="finding-header">
@@ -135,6 +142,7 @@ function Generate-HtmlReport {
                         <p>$escapedDescription</p>
                         $remediationHtml
                         $detailsHtml
+                        $ruleHtml
                     </div>
                 </div>
 "@
@@ -563,6 +571,13 @@ function Generate-HtmlReport {
             line-height: 1.6;
         }
         .finding-body p { margin-bottom: 0.5rem; }
+        .finding-rule {
+            margin-top: 0.5rem;
+            font-size: 0.68rem;
+            color: var(--text-muted, #6b7280);
+            word-break: break-all;
+        }
+        .finding-rule code { font-family: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace; }
 
         /* -- MITRE ATT&CK badges -- */
         .mitre-tags { display: inline-flex; gap: 0.35rem; margin-left: auto; flex-wrap: wrap; }
@@ -905,4 +920,90 @@ function Generate-HtmlReport {
 
     $html | Set-Content $OutputFile -Encoding UTF8
     Write-Status "HTML report generated: $OutputFile"
+}
+
+function ConvertTo-SarifLog {
+    <#
+        Builds a SARIF 2.1.0 log from the findings. Each finding becomes a result with its rule ID,
+        a level from its severity, and a partial fingerprint from RuleId + Key so tools can track the
+        same finding across runs. Findings whose Details name a file path get a physical location.
+    #>
+    param(
+        [object[]]$Findings,
+        [string]$Version
+    )
+
+    $levels = @{ CRITICAL = "error"; WARNING = "warning"; INFO = "note" }
+    $rules = [ordered]@{}
+    $results = [System.Collections.ArrayList]::new()
+
+    foreach ($f in @($Findings)) {
+        if (-not $f) { continue }
+        $ruleId = if ($f.RuleId) { [string]$f.RuleId } else { "CUSTOM-UNKNOWN" }
+        if (-not $rules.Contains($ruleId)) {
+            $rules[$ruleId] = [ordered]@{
+                id                   = $ruleId
+                shortDescription     = @{ text = (($f.Title -split ':')[0]).Trim() }
+                defaultConfiguration = @{ level = $levels[$f.Severity] }
+                properties           = [ordered]@{ category = $f.Category; tags = @($f.MITRE | Where-Object { $_ }) }
+            }
+        }
+
+        $text = "$($f.Title)"
+        if ($f.Description) { $text += ". $($f.Description)" }
+        $result = [ordered]@{
+            ruleId              = $ruleId
+            level               = $levels[$f.Severity]
+            message             = @{ text = $text }
+            partialFingerprints = @{ "amIHacked/v1" = "$ruleId|$($f.Key)" }
+            properties          = [ordered]@{
+                severity    = $f.Severity
+                category    = $f.Category
+                key         = $f.Key
+                mitre       = @($f.MITRE | Where-Object { $_ })
+                remediation = $f.Remediation
+            }
+        }
+
+        $path = $null
+        if ($f.Details -and -not ($f.Details -is [System.Collections.IList])) {
+            foreach ($name in @("Path", "FilePath", "ProcessPath")) {
+                $candidate = $f.Details.$name
+                if ($candidate -is [string] -and $candidate -match '^[A-Za-z]:\\') { $path = $candidate; break }
+            }
+        }
+        if ($path) {
+            $result.locations = @(@{ physicalLocation = @{ artifactLocation = @{ uri = ([System.Uri]::new($path)).AbsoluteUri } } })
+        }
+        $results.Add($result) | Out-Null
+    }
+
+    return [ordered]@{
+        '$schema' = "https://json.schemastore.org/sarif-2.1.0.json"
+        version   = "2.1.0"
+        runs      = @(
+            [ordered]@{
+                tool    = @{
+                    driver = [ordered]@{
+                        name           = "Am I Hacked?"
+                        version        = $Version
+                        informationUri = "https://github.com/TMHSDigital/Am-I-Hacked"
+                        rules          = @($rules.Values)
+                    }
+                }
+                results = @($results)
+            }
+        )
+    }
+}
+
+function Export-SarifReport {
+    param(
+        [object[]]$Findings,
+        [string]$OutputFile,
+        [string]$Version
+    )
+    $log = ConvertTo-SarifLog -Findings $Findings -Version $Version
+    # UTF-8 without BOM: some SARIF consumers reject a BOM
+    [System.IO.File]::WriteAllText($OutputFile, ($log | ConvertTo-Json -Depth 12), [System.Text.UTF8Encoding]::new($false))
 }

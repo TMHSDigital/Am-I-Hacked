@@ -22,6 +22,7 @@ function Invoke-AccountsChecks {
                 if ($user.Enabled -and $user.Description -notmatch "Built-in" -and $user.Description -notmatch "Default") {
                     if (-not $user.PasswordLastSet) {
                         Add-Finding -Severity "INFO" -Category "Account" `
+                            -RuleId "AIH-ACCT-NO-PASSWORD-DATE" -Key "$($user.Name)" `
                             -Title "No Password Set Date: $($user.Name)" `
                             -Description "Enabled local account '$($user.Name)' has no password-set date. This happens for accounts created without a password (for example 'New-LocalUser -NoPassword')." `
                             -Remediation "Verify this account is legitimate. If you didn't create it, disable it: Disable-LocalUser -Name '$($user.Name)'" `
@@ -29,6 +30,7 @@ function Invoke-AccountsChecks {
                             -MITRE @("T1136.001")
                     } elseif (((Get-Date) - $user.PasswordLastSet).TotalDays -le $maxAgeDays) {
                         Add-Finding -Severity "WARNING" -Category "Account" `
+                            -RuleId "AIH-ACCT-NEW-ACCOUNT" -Key "$($user.Name)" `
                             -Title "Recently Created Account: $($user.Name)" `
                             -Description "Local account '$($user.Name)' was created or had its password set within the last $maxAgeDays days (Password set: $($user.PasswordLastSet)). Attackers create local accounts for persistent access." `
                             -Remediation "Verify this account is legitimate. If you didn't create it, disable it immediately: Disable-LocalUser -Name '$($user.Name)'" `
@@ -46,6 +48,7 @@ function Invoke-AccountsChecks {
 
                     if (-not $user.PasswordRequired -and $user.Enabled) {
                         Add-Finding -Severity "WARNING" -Category "Account" `
+                            -RuleId "AIH-ACCT-NO-PASSWORD-REQUIRED" -Key "$($user.Name)" `
                             -Title "No Password Required: $($user.Name)" `
                             -Description "Local account '$($user.Name)' does not require a password. This is a significant security risk." `
                             -Remediation "Set a strong password: Set-LocalUser -Name '$($user.Name)' -PasswordRequired `$true" `
@@ -55,6 +58,7 @@ function Invoke-AccountsChecks {
 
                     if ($user.PasswordExpires -eq $null -and $user.Enabled -and $user.Name -ne "Administrator") {
                         Add-Finding -Severity "INFO" -Category "Account" `
+                            -RuleId "AIH-ACCT-PASSWORD-NEVER-EXPIRES" -Key "$($user.Name)" `
                             -Title "Password Never Expires: $($user.Name)" `
                             -Description "Account '$($user.Name)' has a password that never expires." `
                             -Remediation "Consider setting a password expiration policy for better security hygiene." `
@@ -64,6 +68,7 @@ function Invoke-AccountsChecks {
 
                 if ($user.Name.EndsWith('$') -and $user.Enabled) {
                     Add-Finding -Severity "CRITICAL" -Category "Account" `
+                        -RuleId "AIH-ACCT-HIDDEN-ACCOUNT" -Key "$($user.Name)" `
                         -Title "Hidden Account Detected: $($user.Name)" `
                         -Description "Account '$($user.Name)' ends with '$' which is a technique used to hide accounts from normal enumeration. This is a strong indicator of compromise." `
                         -Remediation "Investigate and disable this account immediately. Check how it was created using Event Viewer." `
@@ -93,6 +98,7 @@ function Invoke-AccountsChecks {
 
             if (-not $isExpected -and $member.ObjectClass -eq "User") {
                 Add-Finding -Severity "WARNING" -Category "Account" `
+                    -RuleId "AIH-ACCT-UNEXPECTED-ADMIN" -Key "$($member.Name)" `
                     -Title "Unexpected Admin: $($member.Name)" `
                     -Description "User '$($member.Name)' ($($member.ObjectClass)) is a member of the local Administrators group. Verify this is intentional." `
                     -Remediation "If unexpected, remove with: Remove-LocalGroupMember -SID 'S-1-5-32-544' -Member '$($member.Name)'" `
@@ -107,6 +113,7 @@ function Invoke-AccountsChecks {
         }
 
         Add-Finding -Severity "INFO" -Category "Account" `
+            -RuleId "AIH-ACCT-ADMIN-GROUP" `
             -Title "Admin Group: $($adminGroup.Count) members" `
             -Description "Local Administrators group contains $($adminGroup.Count) member(s): $(($adminGroup | ForEach-Object { $_.Name }) -join ', ')" `
             -Details @{ Members = $adminGroup | ForEach-Object { $_.Name } }
@@ -145,6 +152,7 @@ function Invoke-AccountsChecks {
                     $recentAttempts = $ipGroup.Group | Select-Object -First 5
 
                     Add-Finding -Severity $severity -Category "Account" `
+                        -RuleId "AIH-ACCT-BRUTE-FORCE" -Key "$($ipGroup.Name)" `
                         -Title "Brute Force: $($ipGroup.Count) failures from $($ipGroup.Name)" `
                         -Description "Detected $($ipGroup.Count) failed login attempts from IP $($ipGroup.Name). Targeted accounts: $(($ipGroup.Group | ForEach-Object { $_.TargetAccount } | Sort-Object -Unique) -join ', '). This may indicate a brute force attack." `
                         -Remediation "Block this IP in your firewall. If it's a local IP, investigate which device it belongs to. Enable account lockout policies." `
@@ -161,6 +169,7 @@ function Invoke-AccountsChecks {
             $last24h = @($failedLogins | Where-Object { $_.TimeCreated -gt (Get-Date).AddHours(-24) })
             if ($last24h.Count -gt 0) {
                 Add-Finding -Severity "INFO" -Category "Account" `
+                    -RuleId "AIH-ACCT-FAILED-LOGONS" `
                     -Title "Failed Logins (24h): $($last24h.Count) attempts" `
                     -Description "There have been $($last24h.Count) failed login attempts in the last 24 hours (out of $($failedLogins.Count) total in log)." `
                     -Details @{ Total = $failedLogins.Count; Last24h = $last24h.Count } `
@@ -170,6 +179,7 @@ function Invoke-AccountsChecks {
     } catch {
         Write-Status "Could not read Security event log (requires admin)." -Color Yellow
         Add-Finding -Severity "INFO" -Category "Account" `
+            -RuleId "AIH-ACCT-EVENTLOG-ACCESS-DENIED" `
             -Title "Event Log Access Denied" `
             -Description "Cannot read the Security event log, so failed-login and RDP session analysis were skipped. Re-run as Administrator." `
             -Remediation "Run this tool as Administrator to enable event log analysis."
@@ -200,6 +210,7 @@ function Invoke-AccountsChecks {
             $uniqueSources = $rdpDetails | ForEach-Object { $_.SourceIP } | Sort-Object -Unique
 
             Add-Finding -Severity "WARNING" -Category "Account" `
+                -RuleId "AIH-ACCT-RDP-LOGONS" `
                 -Title "RDP Logins Detected: $($rdpLogins.Count) sessions" `
                 -Description "Found $($rdpLogins.Count) Remote Desktop (RDP) login events from $($uniqueSources.Count) unique source(s): $($uniqueSources -join ', '). Review these for unauthorized access." `
                 -Remediation "If RDP is not needed, disable it. If needed, use Network Level Authentication and limit access with firewall rules." `
@@ -230,6 +241,7 @@ function Invoke-AccountsChecks {
         foreach ($dump in $dumps) {
             if ($dump.Length -gt 10MB) {
                 Add-Finding -Severity "CRITICAL" -Category "Account" `
+                    -RuleId "AIH-ACCT-MEMORY-DUMP" -Key "$($dump.FullName)" `
                     -Title "Suspicious Memory Dump: $($dump.Name)" `
                     -Description "Found large dump file '$($dump.FullName)' ($(Format-ByteSize $dump.Length)). Large .dmp files in temp/user directories may be LSASS memory dumps used for credential theft." `
                     -Remediation "Investigate this file. If it's an LSASS dump, your credentials are likely compromised. Change all passwords immediately." `
@@ -253,6 +265,7 @@ function Invoke-AccountsChecks {
     foreach ($hive in $hiveCopies) {
         if (Test-Path $hive) {
             Add-Finding -Severity "CRITICAL" -Category "Account" `
+                -RuleId "AIH-ACCT-HIVE-COPY" -Key "$hive" `
                 -Title "Registry Hive Copy Found: $(Split-Path $hive -Leaf)" `
                 -Description "Found a copy of the $(Split-Path $hive -Leaf) registry hive at '$hive'. This is a strong indicator of credential theft — attackers copy SAM/SYSTEM hives to extract password hashes offline." `
                 -Remediation "Delete this file immediately and change all local account passwords. Investigate how this file was created." `
@@ -265,6 +278,7 @@ function Invoke-AccountsChecks {
     foreach ($ntds in $ntdsLocations) {
         if (Test-Path $ntds) {
             Add-Finding -Severity "CRITICAL" -Category "Account" `
+                -RuleId "AIH-ACCT-NTDS-COPY" -Key "$ntds" `
                 -Title "NTDS.dit Copy Found" `
                 -Description "Found a copy of the Active Directory database (ntds.dit) at '$ntds'. This contains ALL domain credentials and is a catastrophic compromise indicator." `
                 -Remediation "This is an emergency. Initiate incident response procedures immediately. All domain passwords should be considered compromised." `
@@ -281,6 +295,7 @@ function Invoke-AccountsChecks {
         $lsaPPL = Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa" -Name "RunAsPPL" -ErrorAction SilentlyContinue
         if (-not $lsaPPL -or $lsaPPL.RunAsPPL -ne 1) {
             Add-Finding -Severity "INFO" -Category "Account" `
+                -RuleId "AIH-ACCT-LSA-PROTECTION" `
                 -Title "LSA Protection Not Enabled" `
                 -Description "LSASS process protection (RunAsPPL) is not enabled. This makes it easier for attackers to dump credentials from memory." `
                 -Remediation "Enable LSA Protection: Set registry HKLM\SYSTEM\CurrentControlSet\Control\Lsa\RunAsPPL to 1 and reboot." `
