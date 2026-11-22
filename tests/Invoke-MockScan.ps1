@@ -90,7 +90,7 @@ try {
     Write-TestHeader "Report Verdict With One Critical"
     $unitFindings = [System.Collections.ArrayList]::new()
     $unitFindings.Add([PSCustomObject]@{ Severity = "CRITICAL"; Category = "Unit"; Title = "Unit critical"; Description = "d"; Remediation = "r"; Details = $null; MITRE = @("T1059") }) | Out-Null
-    $unitFindings.Add([PSCustomObject]@{ Severity = "INFO"; Category = "Unit"; Title = "Unit info"; Description = "d"; Remediation = "r"; Details = $null; MITRE = @("T1059") }) | Out-Null
+    $unitFindings.Add([PSCustomObject]@{ Severity = "INFO"; Category = "Unit"; Title = "Unit info <b>markup</b>"; Description = "d"; Remediation = "r"; Details = $null; MITRE = @("T1059") }) | Out-Null
     $unitReport = Join-Path $testTempDir "unit_report.html"
     Generate-HtmlReport -Findings $unitFindings -SystemInfo @{ ComputerName = "UNIT"; UserName = "unit"; Domain = "unit"; OSVersion = "unit"; OSBuild = "0"; PSVersion = "5.1"; IsAdmin = $false; ScanTime = (Get-Date) } `
         -OutputFile $unitReport -Duration ([timespan]::FromSeconds(1)) -Version "test" | Out-Null
@@ -98,6 +98,7 @@ try {
     Assert-True ($unitHtml -match 'data-verdict="COMPROMISED" data-critical="1"') "Single CRITICAL finding yields COMPROMISED verdict and count 1" "report verdict banner: $([regex]::Match($unitHtml, 'data-verdict="[^"]*" data-critical="[^"]*"').Value)"
     $externalLoads = [regex]::Matches($unitHtml, '(@import|src=|<link)[^>]*https?://') | ForEach-Object { $_.Value }
     Assert-True (@($externalLoads).Count -eq 0 -and $unitHtml -match "Content-Security-Policy") "Report loads no external resources and sets a CSP" (@($externalLoads) -join ", ")
+    Assert-True ($unitHtml.Contains("Unit info &lt;b&gt;markup&lt;/b&gt;") -and -not $unitHtml.Contains("<b>markup</b>")) "Finding titles are HTML-encoded in the report"
 
     Write-TestHeader "IP Helpers"
     Assert-True ((Test-IPInCIDR "8.8.8.8" "0.0.0.0/0") -and (Test-IPInCIDR "20.1.2.3" "20.0.0.0/8") -and -not (Test-IPInCIDR "21.1.2.3" "20.0.0.0/8")) "Test-IPInCIDR handles /0 and /8"

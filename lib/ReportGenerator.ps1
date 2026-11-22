@@ -135,7 +135,7 @@ function Generate-HtmlReport {
                     <div class="finding-header">
                         <span class="sev-indicator sev-$sevClass"></span>
                         <span class="finding-severity">$($finding.Severity)</span>
-                        <span class="finding-title">$($finding.Title)</span>
+                        <span class="finding-title">$([System.Net.WebUtility]::HtmlEncode($finding.Title))</span>
                         $mitreHtml
                     </div>
                     <div class="finding-body">
@@ -787,9 +787,9 @@ function Generate-HtmlReport {
         ${categoryChartHtml}
 
         <div class="system-info">
-            <div><span class="label">Computer</span><span class="value">$($SystemInfo.ComputerName)</span></div>
-            <div><span class="label">User</span><span class="value">$($SystemInfo.Domain)\$($SystemInfo.UserName)</span></div>
-            <div><span class="label">OS</span><span class="value">$($SystemInfo.OSVersion)</span></div>
+            <div><span class="label">Computer</span><span class="value">$([System.Net.WebUtility]::HtmlEncode($SystemInfo.ComputerName))</span></div>
+            <div><span class="label">User</span><span class="value">$([System.Net.WebUtility]::HtmlEncode("$($SystemInfo.Domain)\$($SystemInfo.UserName)"))</span></div>
+            <div><span class="label">OS</span><span class="value">$([System.Net.WebUtility]::HtmlEncode($SystemInfo.OSVersion))</span></div>
             <div><span class="label">Build</span><span class="value">$($SystemInfo.OSBuild)</span></div>
             <div><span class="label">Admin</span><span class="value">$(if ($SystemInfo.IsAdmin) { 'Yes' } else { 'No' })</span></div>
             <div><span class="label">Scan Time</span><span class="value">$($SystemInfo.ScanTime.ToString('yyyy-MM-dd HH:mm:ss'))</span></div>
