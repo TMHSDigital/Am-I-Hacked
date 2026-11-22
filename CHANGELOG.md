@@ -4,6 +4,48 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.6.0] - 2026-11-22
+
+### Added
+- **Stable rule IDs and keys** -- every finding carries a rule ID (e.g. `AIH-FS-AUTORUN`, 101 in total, catalogued in `docs/RULES.md`) and a key naming the item it is about; both appear in the HTML report and JSON export (#20)
+- **Rule/key suppressions** -- `Suppressions` entries can set `rule` and `key` as well as the title `pattern`; existing title patterns keep working (#20)
+- **SARIF export** -- `-ExportSarif` writes a SARIF 2.1.0 log with rules, severity levels, fingerprints and file locations (#20)
+- **Baseline integrity** -- `-CreateBaseline` prints the baseline's SHA-256; `-BaselineHash` makes a scan ignore a baseline that no longer matches, and scans report a baseline edited after it was created (#23)
+- **Baseline diff of scheduled tasks and Defender exclusions** -- new tasks, changed task actions and new exclusions since the baseline are flagged (#12)
+- **`-Modules` and `-ListModules`** -- run only some modules, list what exists; unknown names in `-Modules`/`-SkipModules` now produce a warning instead of being ignored (#28)
+- **PAC and WinHTTP proxy detection** -- `AutoConfigURL` (user, machine and policy) and the machine-wide WinHTTP proxy are reported (#21)
+- **PowerShell profile coverage** -- profile injection checks now read Windows PowerShell 5.1 and PowerShell 7 profiles, for all users (#22)
+- **`CommonRemotePorts` setting** -- outbound ports that never raise "Connection on Uncommon Port" (#2)
+- **CI** -- GitHub Actions runs BOM/parse checks under PowerShell 5.1 and 7, PSScriptAnalyzer, and the mock scan harness on every push (#27); pushing a version tag publishes a release with a zip and its SHA-256
+
+### Changed
+- **Root CA check** -- certificates are compared against Microsoft's trusted root list instead of name fragments, ending false "Unknown Root CA" findings for default Windows roots (#15)
+- **Third-party antivirus** -- when another AV is active, Defender being passive is reported as one INFO instead of two CRITICALs (#7)
+- **Severity escalation** -- a milder rule can no longer downgrade an autorun or scheduled task finding that an earlier rule rated CRITICAL (#6)
+- **VirusTotal** -- lookups are capped by `MaxVTLookups` (counting every request), and rejected keys and rate limits are reported (#24)
+- **FileSystem module** -- split into one function per check; a failing check records an INFO and the rest still run (#18)
+- **Private address ranges** -- APIPA (169.254/16), CGNAT (100.64/10) and IPv6 ULA (fc00::/7) addresses count as private (#31)
+- **README** -- rewritten, with a results guide, privacy table, FAQ, screenshots and an animated demo
+
+### Fixed
+- Trusted IP ranges with non-byte-aligned prefixes (`/12`, `/20`) never matched (#29)
+- `-Redact`/`-CIMode` turned numbers, booleans and dates in finding details into empty objects, and one-item lists into single values (#30, #32)
+- Failed signature checks were reported as unsigned binaries (#3)
+- Normal outbound HTTPS and DNS connections raised "Connection on Uncommon Port" (#2)
+- Report counts were wrong when a finding had only one severity (#1)
+- WMI persistence binding count, default binding and remediation (#4); WMI checks now use `Get-CimInstance` (#14)
+- Defender's non-admin exclusion placeholder was reported as an exclusion (#5)
+- Ad-block hosts entries were flagged as blocking security sites (#8)
+- Each event log clear is reported once (#9); RDP logons are filtered in the event log query (#13)
+- Accounts without `PasswordLastSet` stopped account enumeration (#10)
+- The Security module was re-imported for every signature check (#17)
+- Smaller count, duplicate-finding and message issues (#25)
+
+### Security
+- The HTML report loads nothing from the network (no web fonts) and sets a Content-Security-Policy (#26)
+- Hardened how finding data is written into the HTML report
+- `-Redact` now also covers the report path, CI summary and status lines (#11)
+
 ## [0.5.0] - 2026-03-16
 
 ### Added

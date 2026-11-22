@@ -97,7 +97,7 @@ if ($script:NonInteractive) {
 $script:RedactMap = @{}
 $script:SuppressedCount = 0
 
-$script:Version = "0.5.0"
+$script:Version = "0.6.0"
 
 # ── Helpers (loaded first) ───────────────────────────────────────────────────
 

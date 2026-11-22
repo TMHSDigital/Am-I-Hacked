@@ -231,7 +231,7 @@ Unknown module names passed to `-Modules` or `-SkipModules` produce a warning li
 
 ```
 ---AMIHACKED-SUMMARY-JSON---
-{"verdict":"CAUTION","critical":0,"warning":3,"info":12,"suppressed":0,"total":15,"duration":28.4,"reportPath":"...","version":"0.5.0"}
+{"verdict":"CAUTION","critical":0,"warning":3,"info":12,"suppressed":0,"total":15,"duration":28.4,"reportPath":"...","version":"0.6.0"}
 ```
 
 - Exit code reflects findings: **0** = clean, **1** = warnings only, **2** = critical findings detected
