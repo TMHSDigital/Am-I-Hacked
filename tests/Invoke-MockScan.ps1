@@ -116,6 +116,13 @@ try {
     Assert-True ((Invoke-Redact "Path C:\Users\Jane.Doe\x on ws-01 by JDOE") -eq "Path C:\Users\REDACTED-USER\x on REDACTED-PC by REDACTED-USER") "Invoke-Redact replaces profile path, host and user case-insensitively"
     $redObj = Invoke-RedactObject @{ A = "jdoe"; B = @("WS-01", "x"); C = [PSCustomObject]@{ D = "C:\Users\Jane.Doe" } }
     Assert-True ($redObj.A -eq "REDACTED-USER" -and $redObj.B[0] -eq "REDACTED-PC" -and $redObj.B[1] -eq "x" -and $redObj.C.D -eq "C:\Users\REDACTED-USER") "Invoke-RedactObject redacts nested hashtables, arrays and objects"
+    $when = Get-Date "2026-01-02 03:04:05"
+    $redVals = Invoke-RedactObject @{ Ports = @(80, 443); Mixed = @(7, $true, $when, "jdoe"); Pid = 1234; Obj = [PSCustomObject]@{ N = 5; Users = @("jdoe", 3) } }
+    $typesOk = ($redVals.Ports[0] -is [int] -and $redVals.Ports[0] -eq 80 -and $redVals.Ports[1] -eq 443 -and
+                $redVals.Mixed[0] -eq 7 -and $redVals.Mixed[1] -is [bool] -and $redVals.Mixed[1] -and
+                $redVals.Mixed[2] -is [datetime] -and $redVals.Mixed[2] -eq $when -and $redVals.Mixed[3] -eq "REDACTED-USER" -and
+                $redVals.Pid -eq 1234 -and $redVals.Obj.N -eq 5 -and $redVals.Obj.Users[0] -eq "REDACTED-USER" -and $redVals.Obj.Users[1] -eq 3)
+    Assert-True $typesOk "Invoke-RedactObject keeps numbers, booleans and dates (in arrays and objects) unchanged" ($redVals | ConvertTo-Json -Depth 4 -Compress)
     $script:RedactMode = $false
     $script:RedactMap = @{}
 

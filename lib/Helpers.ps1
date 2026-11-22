@@ -172,10 +172,15 @@ function Invoke-RedactObject {
         }
         return $result
     }
-    if ($Obj -is [System.Collections.IList]) {
-        return @($Obj | ForEach-Object { Invoke-RedactObject $_ })
+    # Numbers, booleans, dates, enums: nothing to redact. Checked on the base object because
+    # PowerShell wraps values in a PSObject, and [PSCustomObject] -is matches any wrapped value.
+    if ($Obj.PSObject.BaseObject -is [ValueType]) {
+        return $Obj
     }
-    if ($Obj -is [PSCustomObject]) {
+    if ($Obj -is [System.Collections.IList]) {
+        return @(foreach ($item in $Obj) { Invoke-RedactObject $item })
+    }
+    if ($Obj.PSObject.BaseObject -is [System.Management.Automation.PSCustomObject]) {
         $result = [PSCustomObject]@{}
         foreach ($prop in $Obj.PSObject.Properties) {
             $result | Add-Member -NotePropertyName $prop.Name -NotePropertyValue (Invoke-RedactObject $prop.Value)
