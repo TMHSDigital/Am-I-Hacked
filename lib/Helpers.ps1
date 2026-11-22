@@ -477,7 +477,8 @@ function Test-IPInCIDR {
         }
 
         if ($remainBits -gt 0) {
-            $mask = [byte](0xFF -shl (8 - $remainBits))
+            # -shl yields an [int] (e.g. 0xFF -shl 4 = 4080); keep only the low byte before comparing
+            $mask = (0xFF -shl (8 - $remainBits)) -band 0xFF
             if (($netBytes[$fullBytes] -band $mask) -ne ($targetBytes[$fullBytes] -band $mask)) {
                 return $false
             }
@@ -485,6 +486,7 @@ function Test-IPInCIDR {
 
         return $true
     } catch {
+        Write-Verbose "Test-IPInCIDR: cannot compare '$IP' with '$CIDR': $($_.Exception.Message)"
         return $false
     }
 }
