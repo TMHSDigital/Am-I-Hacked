@@ -13,8 +13,8 @@
 
 ### Is this Windows machine compromised? One script, one verdict, a report you can act on.
 
-Run it from an elevated PowerShell window. It checks processes, network, accounts, the file system and defenses,<br>
-diffs everything against your own clean baseline, and tells you what to look at first.<br>
+Run it from an elevated PowerShell window. It checks processes, network, accounts, the file system and defenses, diffs everything against your own clean baseline, and tells you what to look at first.
+
 <sub>Built for people who look after their own PCs, help-desk and IT staff triaging a machine, and CI pipelines that need a gate.</sub>
 
 <img src="assets/highlights.svg" alt="A verdict, not a log dump: CLEAN to COMPROMISED, every finding tied to MITRE (101 rules). Change detection you can trust: baselines are never auto-written; pin one by hash (-BaselineHash). Nothing leaves the machine: no network calls unless you add API keys (-Offline). Built for CI and AI agents: exit codes, JSON summary, SARIF, auto-redaction (-CIMode)." width="860">
