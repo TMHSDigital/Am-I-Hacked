@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="150" viewBox="0 0 520 150" role="img" aria-label="Am I Hacked? Windows compromise triage in one PowerShell script">
+  <rect width="520" height="150" rx="14" fill="#0D1117"/>
+  <g transform="translate(28 27) scale(2.0)">
+    <path d="M24 3 L42 9.5 V23 C42 34.5 34.5 42 24 46 C13.5 42 6 34.5 6 23 V9.5 Z" fill="#161B22" stroke="#FF4D4D" stroke-width="2.6" stroke-linejoin="round"/>
+    <path d="M18.6 19.2 C18.6 15.6 21 13.6 24.2 13.6 C27.4 13.6 29.6 15.6 29.6 18.5 C29.6 21.9 25.4 22.6 25.4 26.6" fill="none" stroke="#E6EDF3" stroke-width="3.2" stroke-linecap="round"/>
+    <circle cx="25.4" cy="32.6" r="2.1" fill="#E6EDF3"/>
+  </g>
+  <text x="140" y="80" fill="#E6EDF3" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="46" font-weight="800" textLength="322" lengthAdjust="spacingAndGlyphs">Am I Hacked<tspan fill="#FF4D4D">?</tspan></text>
+  <text x="141" y="111" fill="#8B949E" font-family="ui-monospace, SFMono-Regular, 'Cascadia Mono', Consolas, 'Liberation Mono', Menlo, monospace" font-size="14" textLength="350" lengthAdjust="spacingAndGlyphs">windows compromise triage · one .ps1</text>
+</svg>

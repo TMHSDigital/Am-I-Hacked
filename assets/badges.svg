@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="738" height="44" viewBox="0 0 738 44" role="img" aria-label="Windows 10 and 11. PowerShell 5.1 and 7. Zero dependencies. Offline by default. MIT license.">
+  <rect width="738" height="44" rx="14" fill="#0D1117"/>
+  <g font-family="ui-sans-serif, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" dominant-baseline="central">
+    <circle cx="24" cy="22" r="4.5" fill="#FF4D4D"/>
+    <text x="38" y="22" textLength="118" lengthAdjust="spacingAndGlyphs" fill="#E6EDF3">Windows 10 · 11</text>
+    <rect x="172" y="12" width="1.5" height="20" rx="0.75" fill="#6E7681"/>
+    <text x="188" y="22" textLength="132" lengthAdjust="spacingAndGlyphs" fill="#8B949E">PowerShell 5.1 + 7</text>
+    <rect x="336" y="12" width="1.5" height="20" rx="0.75" fill="#6E7681"/>
+    <rect x="352" y="17" width="10" height="10" rx="2" fill="#3FB950"/>
+    <text x="370" y="22" textLength="128" lengthAdjust="spacingAndGlyphs" fill="#8B949E">zero dependencies</text>
+    <rect x="514" y="12" width="1.5" height="20" rx="0.75" fill="#6E7681"/>
+    <text x="530" y="22" textLength="128" lengthAdjust="spacingAndGlyphs" fill="#8B949E">offline by default</text>
+    <rect x="674" y="12" width="1.5" height="20" rx="0.75" fill="#6E7681"/>
+    <text x="690" y="22" textLength="28" lengthAdjust="spacingAndGlyphs" fill="#8B949E">MIT</text>
+  </g>
+</svg>

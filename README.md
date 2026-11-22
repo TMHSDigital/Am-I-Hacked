@@ -1,40 +1,96 @@
 <div align="center">
 
-<img src="assets/banner.png" alt="Am I Hacked?" width="600">
-
-**Zero-dependency Windows security assessment tool.**<br>
-**Finds compromise indicators. Generates an interactive HTML report. Maps everything to MITRE ATT&CK.**
-
-`CRITICAL` -- strong IOC, act now &nbsp;|&nbsp; `WARNING` -- suspicious, investigate &nbsp;|&nbsp; `INFO` -- worth noting
+<img src="assets/wordmark.svg" alt="Am I Hacked? Windows compromise triage in one PowerShell script" width="520">
 
 <br>
 
-[![CI](https://github.com/TMHSDigital/Am-I-Hacked/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/TMHSDigital/Am-I-Hacked/actions/workflows/ci.yml)
-[![PowerShell 5.1+](https://img.shields.io/badge/PowerShell-5.1%2B%20%7C%207-0d1117?style=for-the-badge&logo=powershell&logoColor=5391FE)](https://docs.microsoft.com/powershell/)
-[![Windows 10/11](https://img.shields.io/badge/Windows-10%20%2F%2011-0d1117?style=for-the-badge&logo=windows&logoColor=white)](https://www.microsoft.com/windows)
-[![License: MIT](https://img.shields.io/badge/License-MIT-0d1117?style=for-the-badge&logoColor=white)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-0.5.0-FF6B6B?style=for-the-badge)](CHANGELOG.md)
+[![CI](https://img.shields.io/github/actions/workflow/status/TMHSDigital/Am-I-Hacked/ci.yml?branch=main&style=for-the-badge&label=ci&labelColor=0D1117&logo=githubactions&logoColor=E6EDF3)](https://github.com/TMHSDigital/Am-I-Hacked/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/TMHSDigital/Am-I-Hacked?style=for-the-badge&label=release&labelColor=0D1117&color=FF4D4D&logo=github&logoColor=E6EDF3)](https://github.com/TMHSDigital/Am-I-Hacked/releases)
+[![Rules](https://img.shields.io/badge/rules-101-E3B341?style=for-the-badge&labelColor=0D1117)](docs/RULES.md)
+[![MITRE ATT&CK](https://img.shields.io/badge/MITRE%20ATT%26CK-46%20techniques-56D4DD?style=for-the-badge&labelColor=0D1117)](#mitre-attck-coverage)
 
-[![Zero Dependencies](https://img.shields.io/badge/Dependencies-Zero-0d1117?style=flat-square&labelColor=0d1117)](#requirements)
-[![MITRE ATT&CK](https://img.shields.io/badge/MITRE%20ATT%26CK-45%2B%20Techniques-ff3333?style=flat-square&labelColor=0d1117)](#mitre-attck-coverage)
-[![Detections](https://img.shields.io/badge/Detections-70%2B-ff3333?style=flat-square&labelColor=0d1117)](#modules)
-[![VirusTotal](https://img.shields.io/badge/VirusTotal-Integrated-394EFF?style=flat-square&labelColor=0d1117&logo=virustotal&logoColor=white)](#configuration)
-[![Scan Time](https://img.shields.io/badge/Scan%20Time-~40s-0d1117?style=flat-square&labelColor=0d1117)](#quick-start)
-[![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-22c55e?style=flat-square&labelColor=0d1117)](CONTRIBUTING.md)
+<img src="assets/badges.svg" alt="Windows 10 and 11 · PowerShell 5.1 and 7 · zero dependencies · offline by default · MIT" width="650">
 
-<br>
+### Is this Windows machine compromised? One script, one verdict, a report you can act on.
 
-**[Quick Start](#quick-start)** · **[Reading the Results](#reading-the-results)** · **[Usage](#usage)** · **[Modules](#modules)** · **[Report](#report)** · **[Configuration](#configuration)** · **[Privacy](#privacy-what-leaves-your-machine)** · **[FAQ](#faq--troubleshooting)**
+Run it from an elevated PowerShell window. It checks processes, network, accounts, the file system and defenses,<br>
+diffs everything against your own clean baseline, and tells you what to look at first.<br>
+<sub>Built for people who look after their own PCs, help-desk and IT staff triaging a machine, and CI pipelines that need a gate.</sub>
+
+<img src="assets/highlights.svg" alt="A verdict, not a log dump: CLEAN to COMPROMISED, every finding tied to MITRE (101 rules). Change detection you can trust: baselines are never auto-written; pin one by hash (-BaselineHash). Nothing leaves the machine: no network calls unless you add API keys (-Offline). Built for CI and AI agents: exit codes, JSON summary, SARIF, auto-redaction (-CIMode)." width="860">
+
+<img src="assets/demo.svg" alt="A sample run in PowerShell: the baseline diff flags a new scheduled task and Defender exclusion, the modules find a PowerShell connection to port 4444 and Word spawning PowerShell, and the verdict is COMPROMISED with 1 critical, 6 warnings and 5 info findings. Synthetic findings." width="860">
+
+[Quick start](#quick-start) &nbsp;·&nbsp; [Reading the results](#reading-the-results) &nbsp;·&nbsp; [Usage](#usage) &nbsp;·&nbsp; [Modules](#modules) &nbsp;·&nbsp; [Report](#report) &nbsp;·&nbsp; [Rule IDs](docs/RULES.md) &nbsp;·&nbsp; [FAQ](#faq--troubleshooting) &nbsp;·&nbsp; [Changelog](CHANGELOG.md)
 
 </div>
+
+> [!IMPORTANT]
+> **Triage, not a guarantee.** A CLEAN verdict means none of the checks fired, not that the machine is clean: kernel rootkits and firmware implants can hide from anything running on the same system. If you have real reason to believe you're compromised, treat it as an incident. The tool only reads system state; it never deletes, quarantines or changes anything.
+
+<details>
+<summary><strong>Contents</strong></summary>
+
+<br>
+
+- [Quick start](#quick-start) · [Why](#why-this-exists) · [How it works](#how-it-works)
+- [Reading the results](#reading-the-results): [Severity](#severity) · [Verdict](#verdict)
+- [Usage](#usage) · [CI and AI agents](#ci--ai-agent-usage)
+- [Modules](#modules) · [Report](#report) · [MITRE ATT&CK coverage](#mitre-attck-coverage)
+- [Configuration](#configuration): [Suppressing false positives](#suppressing-false-positives)
+- [Privacy](#privacy-what-leaves-your-machine) · [Requirements](#requirements) · [FAQ](#faq--troubleshooting)
+- [Contributing](#contributing) · [Security](#security) · [Disclaimer](#disclaimer)
+
+</details>
+
+## Quick Start
+
+```powershell
+git clone https://github.com/TMHSDigital/Am-I-Hacked.git
+cd Am-I-Hacked
+
+# From an elevated (Run as Administrator) PowerShell window, for full results
+.\AmIHacked.ps1
+```
+
+The report opens in your browser when the scan finishes, usually in under a minute. Findings are color-coded by severity, tagged with MITRE ATT&CK technique IDs, and include copy-paste remediation commands.
+
+> [!TIP]
+> **Script blocked?** Run it once with a process-scoped bypass: `powershell -ExecutionPolicy Bypass -File .\AmIHacked.ps1`. Details in the [FAQ](#faq--troubleshooting).
+
+<details>
+<summary><strong>First time? Create a baseline first.</strong></summary>
+
+```powershell
+# Step 1: on a system you trust, snapshot the current state
+.\AmIHacked.ps1 -CreateBaseline
+# Note the SHA-256 it prints and keep it somewhere safe
+
+# Step 2: run scans any time later. Changes since the baseline are flagged.
+.\AmIHacked.ps1 -BaselineHash <sha256-from-step-1>
+```
+
+Baselines enable **change detection**, the most useful signal for catching compromises. New ports, services, accounts, autorun entries, scheduled tasks (including changed task actions), and Defender exclusions are flagged against your snapshot.
+
+> Baselines are only written when you pass `-CreateBaseline`. A scan of a compromised system never overwrites your clean baseline.
+> Anything with write access to the `reports` folder could still edit it, so keep the SHA-256 printed by `-CreateBaseline` (or a copy of the baseline) on removable or remote storage and pass it back with `-BaselineHash`. Scans also report an INFO when the baseline file was modified after it was created.
+
+</details>
 
 ---
 
 ## Why This Exists
 
-Most security tools are either enterprise-grade ($$$ + agents + cloud) or one-liners that check three things. **Am I Hacked?** fills the gap: one PowerShell script that runs 70+ heuristic checks across 5 security domains, compares against your own clean baseline, and produces an actionable HTML report. No installation, no dependencies, and no internet unless you add API keys.
+Most security tools are either enterprise-grade (licences, agents, a cloud console) or one-liners that check three things. **Am I Hacked?** sits in between: one PowerShell script, 101 detection rules across 5 security domains, a diff against your own clean baseline, and a report that says what to do next. No installation, no dependencies, and no internet unless you add API keys.
 
-**Run it. Read the report. Know where you stand.**
+| | Am I Hacked? | Ad-hoc one-liners | Enterprise EDR |
+|---|---|---|---|
+| Install | Clone and run | None | Agent rollout |
+| Covers persistence, accounts, network, defenses | Yes, 101 rules | A few checks | Yes |
+| Diffs against *your* clean state | Yes, hash-pinned baseline | No | Varies |
+| Readable verdict and remediation | HTML report + exit codes | Raw output | Console |
+| Data leaves the machine | Never by default | No | Yes |
+| Cost | Free, MIT | Free | Per seat |
 
 <p align="center">
   <img src="assets/report-overview.png" alt="Report overview: verdict banner, security score, and severity counts" width="49%">
@@ -68,41 +124,6 @@ flowchart LR
 
 ---
 
-## Quick Start
-
-```powershell
-git clone https://github.com/TMHSDigital/Am-I-Hacked.git
-cd Am-I-Hacked
-
-# From an elevated (Run as Administrator) PowerShell window, for full results
-.\AmIHacked.ps1
-```
-
-The report opens in your browser when the scan finishes. Findings are color-coded by severity, tagged with MITRE ATT&CK technique IDs, and include copy-paste remediation commands.
-
-> **Script blocked?** If PowerShell refuses to run the script, see [FAQ](#faq--troubleshooting). The short version: `powershell -ExecutionPolicy Bypass -File .\AmIHacked.ps1`.
-
-<details>
-<summary><strong>First time? Create a baseline first.</strong></summary>
-
-```powershell
-# Step 1: on a system you trust, snapshot the current state
-.\AmIHacked.ps1 -CreateBaseline
-# Note the SHA-256 it prints and keep it somewhere safe
-
-# Step 2: run scans any time later. Changes since the baseline are flagged.
-.\AmIHacked.ps1 -BaselineHash <sha256-from-step-1>
-```
-
-Baselines enable **change detection**, the most useful signal for catching compromises. New ports, services, accounts, autorun entries, scheduled tasks (including changed task actions), and Defender exclusions are flagged against your snapshot.
-
-> Baselines are only written when you pass `-CreateBaseline`. A scan of a compromised system never overwrites your clean baseline.
-> Anything with write access to the `reports` folder could still edit it, so keep the SHA-256 printed by `-CreateBaseline` (or a copy of the baseline) on removable or remote storage and pass it back with `-BaselineHash`. Scans also report an INFO when the baseline file was modified after it was created.
-
-</details>
-
----
-
 ## Reading the Results
 
 ### Severity
@@ -124,7 +145,8 @@ Baselines enable **change detection**, the most useful signal for catching compr
 
 The **security score** starts at 100 and subtracts 25 per CRITICAL, 5 per WARNING, and 0.5 per INFO, clamped to 0 to 100.
 
-> **CLEAN does not mean guaranteed clean.** This is a heuristic triage tool. Sophisticated malware (kernel rootkits, firmware implants) can hide from anything that runs on the same system. If you have real reason to believe you're compromised, treat it as an incident: disconnect, preserve evidence, and get professional help.
+> [!WARNING]
+> **CLEAN does not mean guaranteed clean.** This is a heuristic triage tool. If you have real reason to believe you're compromised, treat it as an incident: disconnect, preserve evidence, and get professional help.
 
 <details>
 <summary><strong>Got a CRITICAL? A short playbook.</strong></summary>
