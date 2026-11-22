@@ -321,6 +321,21 @@ try {
     Remove-Item Function:\Get-MpComputerStatus, Function:\Get-ActiveThirdPartyAV
     . "$repoRoot\lib\Helpers.ps1"
 
+    Write-TestHeader "FileSystem Check Isolation"
+    . "$repoRoot\modules\Check-FileSystem.ps1"
+    $fsChecks = @(Get-Command -CommandType Function -Name "Test-*" | Where-Object { $_.ScriptBlock.File -like "*\modules\Check-FileSystem.ps1" } | ForEach-Object Name)
+    $script:FsCalls = [System.Collections.ArrayList]::new()
+    foreach ($fsCheck in $fsChecks) {
+        Set-Item -Path "Function:\$fsCheck" -Value ([scriptblock]::Create("`$script:FsCalls.Add('$fsCheck') | Out-Null"))
+    }
+    Set-Item -Path "Function:\Test-RecentSystemBinary" -Value { $script:FsCalls.Add("Test-RecentSystemBinary") | Out-Null; throw "simulated failure" }
+    $script:Findings = [System.Collections.ArrayList]::new()
+    Invoke-FileSystemChecks *> $null
+    $fsErr = @($script:Findings | Where-Object { $_.Title -eq "FileSystem Check Error: Test-RecentSystemBinary" })
+    Assert-True ($fsChecks.Count -ge 13 -and $script:FsCalls.Count -eq $fsChecks.Count -and $fsErr.Count -eq 1) "An error in one FileSystem check is reported and the remaining checks still run" "$($script:FsCalls.Count) of $($fsChecks.Count) checks ran, $($fsErr.Count) error finding(s)"
+    foreach ($fsCheck in $fsChecks) { Remove-Item "Function:\$fsCheck" -ErrorAction SilentlyContinue }
+    . "$repoRoot\modules\Check-FileSystem.ps1"
+
     Write-TestHeader "Accounts Without PasswordLastSet"
     . "$repoRoot\modules\Check-Accounts.ps1"
     function Get-LocalUser {

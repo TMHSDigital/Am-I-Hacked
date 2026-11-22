@@ -6,11 +6,38 @@ Author: Am I Hacked Project
 #>
 
 function Invoke-FileSystemChecks {
+    # Each check runs on its own, so an unexpected error in one does not skip the rest.
+    $checks = @(
+        "Test-RecentSystemBinary",
+        "Test-TempFile",
+        "Test-AlternateDataStream",
+        "Test-InfoStealerArtifact",
+        "Test-AutorunPersistence",
+        "Test-StartupFolder",
+        "Test-AdvancedPersistence",
+        "Test-ComHijacking",
+        "Test-WmiPersistence",
+        "Test-ScheduledTask",
+        "Test-GhostScheduledTask",
+        "Test-BitsJob",
+        "Test-DefenderExclusion"
+    )
+    foreach ($check in $checks) {
+        try {
+            & $check
+        } catch {
+            Write-Status "Error in ${check}: $_" -Color Yellow
+            Add-Finding -Severity "INFO" -Category "FileSystem" -Title "FileSystem Check Error: $check" `
+                -Description "The $check check stopped with an error: $_" `
+                -Remediation "The other FileSystem checks still ran. Re-run as Administrator, or report the error if it persists."
+        }
+    }
+}
+
+function Test-RecentSystemBinary {
+    # ── 1. Recently Modified System Executables ──────────────────────────
 
     $maxAgeDays = $script:Config.FileSystemMaxAgeDays
-    $suspiciousExtensions = @($script:Config.SuspiciousTempExtensions)
-
-    # ── 1. Recently Modified System Executables ──────────────────────────
 
     Write-Status "Checking for recently modified executables in system directories..."
 
@@ -74,8 +101,12 @@ function Invoke-FileSystemChecks {
             Write-Status "Could not scan $dir : $_" -Color Yellow
         }
     }
+}
 
+function Test-TempFile {
     # ── 2. Suspicious Files in Temp/AppData ──────────────────────────────
+
+    $suspiciousExtensions = @($script:Config.SuspiciousTempExtensions)
 
     Write-Status "Scanning temp and AppData for suspicious files..."
 
@@ -211,7 +242,9 @@ function Invoke-FileSystemChecks {
             -Description "Found $($vtCandidates.Count) unsigned executables in temp directories but no VirusTotal API key is configured." `
             -Remediation "Get a free API key at https://www.virustotal.com/ and add it to config.json as 'VirusTotalAPIKey'."
     }
+}
 
+function Test-AlternateDataStream {
     # ── 4. Alternate Data Streams ────────────────────────────────────────
 
     Write-Status "Checking for Alternate Data Streams (ADS)..."
@@ -260,7 +293,9 @@ function Invoke-FileSystemChecks {
     if ($adsCount -eq 0) {
         Write-Status "No suspicious Alternate Data Streams found."
     }
+}
 
+function Test-InfoStealerArtifact {
     # ── 5. Info-Stealer Artifact Scan ────────────────────────────────────
 
     Write-Status "Checking for info-stealer artifacts..."
@@ -339,7 +374,9 @@ function Invoke-FileSystemChecks {
             Write-Verbose "Could not check wallet file access at '$wp': $_"
         }
     }
+}
 
+function Test-AutorunPersistence {
     # ── 6. Persistence via Common Autorun Locations ──────────────────────
 
     Write-Status "Checking common persistence/autorun locations..."
@@ -404,7 +441,9 @@ function Invoke-FileSystemChecks {
             Write-Verbose "Could not read autorun key '$key': $_"
         }
     }
+}
 
+function Test-StartupFolder {
     # ── 6b. Startup Folder Executables ───────────────────────────────────
 
     Write-Status "Checking startup folder contents..."
@@ -439,7 +478,9 @@ function Invoke-FileSystemChecks {
             Write-Verbose "Could not scan startup folder '$startupFolder': $_"
         }
     }
+}
 
+function Test-AdvancedPersistence {
     # ── 7. Advanced Persistence: IFEO, AppInit_DLLs, Winlogon ────────────
 
     Write-Status "Checking advanced persistence mechanisms..."
@@ -505,7 +546,9 @@ function Invoke-FileSystemChecks {
     } catch {
         Write-Verbose "Could not check Winlogon keys: $_"
     }
+}
 
+function Test-ComHijacking {
     # ── 8. COM Hijacking ─────────────────────────────────────────────────
 
     Write-Status "Checking for COM object hijacking..."
@@ -560,7 +603,9 @@ function Invoke-FileSystemChecks {
     } catch {
         Write-Verbose "Could not enumerate HKCU COM CLSID keys: $_"
     }
+}
 
+function Test-WmiPersistence {
     # ── 9. WMI Persistence ───────────────────────────────────────────────
 
     Write-Status "Checking for WMI persistence subscriptions..."
@@ -640,7 +685,9 @@ function Invoke-FileSystemChecks {
     } catch {
         Write-Status "Could not enumerate WMI namespaces: $(Get-WmiErrorReason $_)" -Color Yellow
     }
+}
 
+function Test-ScheduledTask {
     # ── 10. Scheduled Tasks Check ────────────────────────────────────────
 
     Write-Status "Checking scheduled tasks for suspicious entries..."
@@ -717,7 +764,9 @@ function Invoke-FileSystemChecks {
     } catch {
         Write-Status "Could not enumerate scheduled tasks." -Color Yellow
     }
+}
 
+function Test-GhostScheduledTask {
     # ── 11. Ghost Scheduled Tasks (Registry-based) ───────────────────────
 
     Write-Status "Checking for ghost/hidden scheduled tasks..."
@@ -779,7 +828,9 @@ function Invoke-FileSystemChecks {
     } catch {
         Write-Status "Could not check ghost scheduled tasks (may need admin)." -Color Yellow
     }
+}
 
+function Test-BitsJob {
     # ── 12. BITS Job Abuse ───────────────────────────────────────────────
 
     Write-Status "Checking for suspicious BITS transfer jobs..."
@@ -841,7 +892,9 @@ function Invoke-FileSystemChecks {
     } catch {
         Write-Status "Could not check BITS jobs (may need admin)." -Color Yellow
     }
+}
 
+function Test-DefenderExclusion {
     # ── 13. Windows Defender Exclusions ──────────────────────────────────
 
     Write-Status "Checking Windows Defender exclusions..."
@@ -902,5 +955,4 @@ function Invoke-FileSystemChecks {
     } catch {
         Write-Status "Could not check Defender exclusions (may need admin)." -Color Yellow
     }
-
 }
