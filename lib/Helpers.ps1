@@ -168,7 +168,7 @@ function Invoke-RedactObject {
     if ($Obj -is [hashtable]) {
         $result = @{}
         foreach ($k in $Obj.Keys) {
-            $result[$k] = Invoke-RedactObject $Obj[$k]
+            $result[$k] = Get-RedactedValue $Obj[$k]
         }
         return $result
     }
@@ -178,16 +178,28 @@ function Invoke-RedactObject {
         return $Obj
     }
     if ($Obj -is [System.Collections.IList]) {
-        return @(foreach ($item in $Obj) { Invoke-RedactObject $item })
+        return @(foreach ($item in $Obj) { Get-RedactedValue $item })
     }
     if ($Obj.PSObject.BaseObject -is [System.Management.Automation.PSCustomObject]) {
         $result = [PSCustomObject]@{}
         foreach ($prop in $Obj.PSObject.Properties) {
-            $result | Add-Member -NotePropertyName $prop.Name -NotePropertyValue (Invoke-RedactObject $prop.Value)
+            $result | Add-Member -NotePropertyName $prop.Name -NotePropertyValue (Get-RedactedValue $prop.Value)
         }
         return $result
     }
     return $Obj
+}
+
+function Get-RedactedValue {
+    <#
+        Invoke-RedactObject for a value that is about to be stored. PowerShell unrolls a function's
+        array output, so one-element arrays would become single values and empty arrays $null;
+        lists are re-wrapped here so the stored value keeps its shape.
+    #>
+    param([object]$Value)
+    $redacted = Invoke-RedactObject $Value
+    if ($Value -is [System.Collections.IList]) { return ,@($redacted) }
+    return $redacted
 }
 
 # ── Finding Management ───────────────────────────────────────────────────────
@@ -207,7 +219,7 @@ function Add-Finding {
     $Title       = Invoke-Redact $Title
     $Description = Invoke-Redact $Description
     $Remediation = Invoke-Redact $Remediation
-    $Details     = Invoke-RedactObject $Details
+    $Details     = Get-RedactedValue $Details
 
     if ($script:Config.Suppressions) {
         foreach ($sup in $script:Config.Suppressions) {

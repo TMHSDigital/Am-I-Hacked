@@ -124,6 +124,12 @@ try {
                 $redVals.Mixed[2] -is [datetime] -and $redVals.Mixed[2] -eq $when -and $redVals.Mixed[3] -eq "REDACTED-USER" -and
                 $redVals.Pid -eq 1234 -and $redVals.Obj.N -eq 5 -and $redVals.Obj.Users[0] -eq "REDACTED-USER" -and $redVals.Obj.Users[1] -eq 3)
     Assert-True $typesOk "Invoke-RedactObject keeps numbers, booleans and dates (in arrays and objects) unchanged" ($redVals | ConvertTo-Json -Depth 4 -Compress)
+    $redShape = Invoke-RedactObject @{ One = @("jdoe"); Port = @(445); Empty = @(); Nested = @(@(1, 2), 3); Obj = [PSCustomObject]@{ L = @("x") } }
+    $shapeOk = ($redShape.One -is [array] -and $redShape.One.Count -eq 1 -and $redShape.One[0] -eq "REDACTED-USER" -and
+                $redShape.Port -is [array] -and $redShape.Port[0] -eq 445 -and $redShape.Empty -is [array] -and $redShape.Empty.Count -eq 0 -and
+                $redShape.Nested.Count -eq 2 -and $redShape.Nested[0] -is [array] -and $redShape.Nested[0].Count -eq 2 -and
+                $redShape.Obj.L -is [array] -and $redShape.Obj.L.Count -eq 1)
+    Assert-True $shapeOk "Invoke-RedactObject keeps one-element, empty and nested arrays as arrays" ($redShape | ConvertTo-Json -Depth 4 -Compress)
     $script:RedactMode = $false
     $script:RedactMap = @{}
 
