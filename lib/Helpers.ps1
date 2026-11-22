@@ -497,13 +497,20 @@ function Test-IPInCIDR {
 }
 
 function Test-IsPrivateIP {
+    <# Private, loopback, link-local, CGNAT and IPv6 unique-local addresses (not routed on the public internet). #>
     param([string]$IP)
-    return ($IP -match "^10\." -or
-            $IP -match "^172\.(1[6-9]|2[0-9]|3[01])\." -or
-            $IP -match "^192\.168\." -or
-            $IP -match "^127\." -or
-            $IP -eq "::1" -or
-            $IP -match "^fe80:")
+    $addr = $null
+    if (-not [System.Net.IPAddress]::TryParse(($IP -replace '%.*$', ''), [ref]$addr)) { return $false }
+    if ($addr.IsIPv4MappedToIPv6) { $addr = $addr.MapToIPv4() }
+    $ranges = @(
+        "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16",   # RFC 1918
+        "127.0.0.0/8", "169.254.0.0/16", "100.64.0.0/10",   # loopback, link-local (APIPA), carrier-grade NAT
+        "::1/128", "fe80::/10", "fc00::/7"                  # IPv6 loopback, link-local, unique-local
+    )
+    foreach ($range in $ranges) {
+        if (Test-IPInCIDR $addr.ToString() $range) { return $true }
+    }
+    return $false
 }
 
 function Get-FileSignature {

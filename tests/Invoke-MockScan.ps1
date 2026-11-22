@@ -108,7 +108,8 @@ try {
     Assert-True ((Test-IPInCIDR "2001:db8:abcd::1" "2001:db8:a000::/36") -and -not (Test-IPInCIDR "2001:db8:b000::1" "2001:db8:a000::/36")) "Test-IPInCIDR handles a non-byte-aligned IPv6 prefix"
     Assert-True (-not (Test-IPInCIDR "::ffff:20.1.2.3" "20.0.0.0/8") -and -not (Test-IPInCIDR "20.1.2.3" "2001:db8::/32")) "Test-IPInCIDR does not match across IPv4/IPv6"
     Assert-True ((Test-IsPrivateIP "10.1.2.3") -and (Test-IsPrivateIP "172.16.0.1") -and (Test-IsPrivateIP "192.168.1.1") -and (Test-IsPrivateIP "127.0.0.1") -and (Test-IsPrivateIP "::1") -and (Test-IsPrivateIP "fe80::1")) "Test-IsPrivateIP recognises RFC 1918, loopback and link-local IPv6"
-    Assert-True (-not (Test-IsPrivateIP "172.32.0.1") -and -not (Test-IsPrivateIP "8.8.8.8")) "Test-IsPrivateIP rejects public addresses"
+    Assert-True ((Test-IsPrivateIP "169.254.1.1") -and (Test-IsPrivateIP "100.64.0.1") -and (Test-IsPrivateIP "100.127.255.254") -and (Test-IsPrivateIP "fd00::1") -and (Test-IsPrivateIP "FC12:3456::1") -and (Test-IsPrivateIP "::ffff:192.168.1.1") -and (Test-IsPrivateIP "fe80::1%12")) "Test-IsPrivateIP recognises APIPA, CGNAT, IPv6 ULA, mapped and scoped addresses"
+    Assert-True (-not (Test-IsPrivateIP "172.32.0.1") -and -not (Test-IsPrivateIP "8.8.8.8") -and -not (Test-IsPrivateIP "100.128.0.1") -and -not (Test-IsPrivateIP "100.63.255.255") -and -not (Test-IsPrivateIP "2001:4860::8888") -and -not (Test-IsPrivateIP "not-an-ip")) "Test-IsPrivateIP rejects public addresses"
 
     Write-TestHeader "Redaction"
     $script:RedactMode = $true
