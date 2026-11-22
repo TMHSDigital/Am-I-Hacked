@@ -18,3 +18,6 @@ desktop.ini
 *.swp
 *.swo
 claude_code_prompt.md
+
+# Release builds (scripts/Build-Release.ps1)
+dist/

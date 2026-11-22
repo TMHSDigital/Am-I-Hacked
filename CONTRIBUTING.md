@@ -123,3 +123,13 @@ If the hook blocks your commit, run `fix-bom.ps1`, re-stage, and commit again.
    - What the check detects
    - False positive considerations
    - Any config additions needed
+
+## Releasing (maintainers)
+
+Releases are built by `.github/workflows/release.yml` when a version tag is pushed:
+
+1. Set `$script:Version` in `AmIHacked.ps1`, add a `## [x.y.z] - YYYY-MM-DD` section to `CHANGELOG.md`, and update the supported versions in `SECURITY.md`.
+2. Preview the release locally: `.\scripts\Build-Release.ps1 -Tag vx.y.z` (checks the version, writes the notes and the zip to `dist\`).
+3. Commit to `main`, then tag and push: `git tag vx.y.z` and `git push origin main vx.y.z`.
+
+The workflow runs the full CI suite, fails if the tag and `$script:Version` disagree or the changelog section is missing, and publishes a GitHub release with the changelog section as notes, `Am-I-Hacked-x.y.z.zip`, and its `.sha256`. Tags with a suffix (`v1.0.0-rc.1`) become pre-releases.

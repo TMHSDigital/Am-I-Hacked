@@ -1,0 +1,53 @@
+name: Release
+
+# Push a tag such as v0.6.0 to release. The tag must match $script:Version in
+# AmIHacked.ps1 and CHANGELOG.md must have a "## [0.6.0]" section; its text
+# becomes the release notes. The full CI suite runs first.
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    name: Publish GitHub release
+    needs: checks
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Check version, extract notes, package
+        shell: pwsh
+        env:
+          TAG: ${{ github.ref_name }}
+        run: .\scripts\Build-Release.ps1 -Tag $env:TAG -OutputPath dist; exit $LASTEXITCODE
+
+      - name: Create or update the release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          $assets = @(Get-ChildItem dist -File | Where-Object Name -ne 'release-notes.md' | ForEach-Object FullName)
+          gh release view $env:TAG --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:TAG @assets --clobber --repo $env:GITHUB_REPOSITORY
+          } else {
+            $pre = if ($env:TAG -match '-') { @('--prerelease') } else { @() }
+            gh release create $env:TAG @assets --repo $env:GITHUB_REPOSITORY --title $env:TAG --notes-file dist/release-notes.md --verify-tag @pre
+          }
+          exit $LASTEXITCODE
